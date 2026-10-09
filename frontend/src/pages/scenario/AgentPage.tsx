@@ -59,6 +59,8 @@ export interface AgentApplyContext {
     rules: any[];
     /** Set for agents with slot routing. */
     slotMode?: SlotMode;
+    /** Slot routing, unified mode: slots with a rule of their own. */
+    slots?: string[];
 }
 
 /** The Quick Start card: install → configure → pick a model. */
@@ -123,6 +125,7 @@ export interface AgentPageSlot {
     rules: any[];
     loadRules: (scenario: string) => Promise<void>;
     slotMode?: SlotMode;
+    slots?: string[];
     dialogOpen: boolean;
     /** Close the setup dialog and drop a pending 1M-context change. */
     closeDialog: () => void;
@@ -199,7 +202,8 @@ const AgentPageContent: React.FC<{ agent: AgentPageDescriptor }> = ({ agent }) =
             setIsApplyLoading(false);
         }
     };
-    const applyContext: AgentApplyContext = { rules, slotMode };
+    const slotList = slotRouting ? slots.slots : undefined;
+    const applyContext: AgentApplyContext = { rules, slotMode, slots: slotList };
 
     const slot: AgentPageSlot = {
         scenario,
@@ -209,6 +213,7 @@ const AgentPageContent: React.FC<{ agent: AgentPageDescriptor }> = ({ agent }) =
         rules,
         loadRules,
         slotMode,
+        slots: slotList,
         dialogOpen,
         closeDialog: () => {
             setDialogOpen(false);
@@ -340,6 +345,7 @@ const AgentPageContent: React.FC<{ agent: AgentPageDescriptor }> = ({ agent }) =
                                         ariaLabel={slotModeLabel}
                                     />
                                 </ToggleRow>
+                                {slots.slotsRow && <Box sx={{ py: 0.5 }}>{slots.slotsRow}</Box>}
                             </Box>
                         )}
                     </Box>
