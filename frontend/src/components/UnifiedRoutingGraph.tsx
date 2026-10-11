@@ -109,6 +109,9 @@ export interface UnifiedRoutingGraphProps {
     // Slots
     extraActions?: React.ReactNode;
     extensionsCard?: React.ReactNode;
+    /** Plugins tag in the rule header (count + click), see ModelRequestHeader. */
+    pluginsCount?: number;
+    onPluginsClick?: (anchor: HTMLElement) => void;
 
     // Scroll control: when true, auto-scroll to 80% position (for guide mode)
     autoScroll?: boolean;
@@ -192,6 +195,8 @@ export const UnifiedRoutingGraph: React.FC<UnifiedRoutingGraphProps> = ({
                                                                             onContext1MToggle,
                                                                             extraActions,
                                                                             extensionsCard,
+                                                                            pluginsCount,
+                                                                            onPluginsClick,
                                                                             autoScroll,
                                                                         }) => {
     const {t} = useTranslation();
@@ -504,6 +509,8 @@ export const UnifiedRoutingGraph: React.FC<UnifiedRoutingGraphProps> = ({
                 endpointSelection={endpointSelection}
                 responsesProbing={responsesProbing}
                 onEndpointSelect={showEndpointSelection ? handleEndpointSelect : undefined}
+                pluginsCount={pluginsCount}
+                onPluginsClick={onPluginsClick}
             />
 
             {/* Tier Guide Dialog */}

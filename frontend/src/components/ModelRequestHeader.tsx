@@ -18,7 +18,9 @@ import {
     Check as CheckIcon,
     Close as CloseIcon,
     ExpandMore as ExpandMoreIcon,
+    Extension as ExtensionIcon,
 } from '@/components/icons';
+import { useTranslation } from 'react-i18next';
 import { isWildcardModelName } from '@/components/rule-card/utils';
 import { notify } from '@/utils/notify';
 import { fontMono, fontSizes } from '@/theme/fonts';
@@ -93,6 +95,8 @@ const ActionsSection = styled(Box)(({ theme }) => ({
     alignItems: 'center',
     gap: theme.spacing(0.25),
     flexShrink: 0,
+    // When the header wraps (narrow window), the actions stay at the right edge.
+    marginLeft: 'auto',
 }));
 
 const ModelNameText = styled(Typography)(({ theme }) => ({
@@ -125,6 +129,10 @@ export interface ModelRequestHeaderProps {
     endpointSelection?: OpenAIEndpointSelection;
     responsesProbing?: boolean;
     onEndpointSelect?: (selection: OpenAIEndpointSelection) => void;
+    // Plugins are low-frequency: a "Plugins N" tag shows only when the rule
+    // has some; adding / removing lives in the rule's "⋯" menu.
+    pluginsCount?: number;
+    onPluginsClick?: (anchor: HTMLElement) => void;
 }
 
 export const ModelRequestHeader: React.FC<ModelRequestHeaderProps> = ({
@@ -144,7 +152,10 @@ export const ModelRequestHeader: React.FC<ModelRequestHeaderProps> = ({
     endpointSelection = 'auto',
     responsesProbing = false,
     onEndpointSelect,
+    pluginsCount = 0,
+    onPluginsClick,
 }) => {
+    const { t } = useTranslation();
     const [editMode, setEditMode] = useState(false);
     const [tempValue, setTempValue] = useState(modelName);
     const [contextMenuAnchor, setContextMenuAnchor] = useState<HTMLElement | null>(null);
@@ -395,6 +406,25 @@ export const ModelRequestHeader: React.FC<ModelRequestHeaderProps> = ({
                                 </MenuItem>
                             ))}
                         </Menu>
+                    </Box>
+                )}
+
+                {pluginsCount > 0 && onPluginsClick && (
+                    <Box sx={{ml: 0.5}} onClick={(e) => e.stopPropagation()}>
+                        <Tooltip title={t('ruleHeader.pluginsTooltip')}>
+                            <Button
+                                size="small"
+                                variant="outlined"
+                                color="inherit"
+                                startIcon={<ExtensionIcon sx={{fontSize: 14}} />}
+                                aria-label={`${t('ruleHeader.plugins')} ${pluginsCount}`}
+                                aria-haspopup="dialog"
+                                onClick={(e) => onPluginsClick(e.currentTarget)}
+                                sx={{...strategyButtonSx, '& .MuiButton-startIcon': {mr: 0.5, ml: 0}}}
+                            >
+                                {t('ruleHeader.plugins')} {pluginsCount}
+                            </Button>
+                        </Tooltip>
                     </Box>
                 )}
             </Box>

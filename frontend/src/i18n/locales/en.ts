@@ -2186,6 +2186,13 @@ export default {
       "videoWebmOnly": "This browser has no H.264 encoder, so the file will be a WebM — playable in browsers, but some chat apps refuse it."
     }
   },
+  "ruleHeader": {
+    "plugins": "Plugins",
+    "pluginsTooltip": "Plugins enabled on this rule",
+    "managePlugins": "Manage plugins",
+    "test": "Test",
+    "ruleActions": "Rule actions"
+  },
   "agentActivity": {
     "usage": "Usage",
     "requests": "Requests",

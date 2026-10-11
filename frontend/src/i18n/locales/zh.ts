@@ -2179,6 +2179,13 @@ export default {
       "videoWebmOnly": "当前浏览器没有 H.264 编码器,只能导出 WebM——浏览器里能播放,但部分聊天应用不接受。"
     }
   },
+  "ruleHeader": {
+    "plugins": "插件",
+    "pluginsTooltip": "此规则已启用的插件",
+    "managePlugins": "管理插件",
+    "test": "测试",
+    "ruleActions": "规则操作"
+  },
   "agentActivity": {
     "usage": "用量",
     "requests": "请求",

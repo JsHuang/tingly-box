@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Box, CircularProgress, Fade, IconButton, Tooltip, Typography } from '@mui/material';
+import { Box, Button, CircularProgress, Fade, IconButton, Tooltip, Typography } from '@mui/material';
 import { alpha, useTheme } from '@mui/material/styles';
 import { useTranslation } from 'react-i18next';
 import {
@@ -24,7 +24,7 @@ interface QuickProbeButtonProps {
 }
 
 // QuickProbeButton: one-click streaming probe for a rule, living in the rule
-// card header. No menu, no dialog up front — click the bolt, get a compact
+// card header. No menu, no dialog up front — click "Test", get a compact
 // verdict pill (status + latency) in place. Clicking the pill opens the full
 // ProbeDialog pre-loaded with this result for the journey/response details.
 export const QuickProbeButton: React.FC<QuickProbeButtonProps> = ({ ruleUuid, ruleName, scenario, model, runSignal }) => {
@@ -128,14 +128,17 @@ export const QuickProbeButton: React.FC<QuickProbeButtonProps> = ({ ruleUuid, ru
 
             <Tooltip title={t('probe.quickTest')}>
                 <span>
-                    <IconButton
+                    <Button
                         size="small"
+                        variant="outlined"
+                        color="inherit"
                         onClick={run}
                         disabled={running}
-                        sx={{ color: 'text.secondary', '&:hover': { backgroundColor: 'action.hover' } }}
+                        startIcon={running ? <CircularProgress size={14} thickness={5} /> : <BoltIcon sx={{ fontSize: 16 }} />}
+                        sx={{ height: 26, px: 1, textTransform: 'none', fontSize: fontSizes.sm, fontWeight: 600, borderColor: 'divider', whiteSpace: 'nowrap' }}
                     >
-                        {running ? <CircularProgress size={16} thickness={5} /> : <BoltIcon fontSize="small" />}
-                    </IconButton>
+                        {t('ruleHeader.test')}
+                    </Button>
                 </span>
             </Tooltip>
 
