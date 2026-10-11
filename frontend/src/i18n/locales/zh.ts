@@ -2198,6 +2198,14 @@ export default {
     "usage": "用量",
     "usageTooltip": "打开仪表盘，并按此 Agent 过滤"
   },
+  "agentAccess": {
+    "title": "接入",
+    "expand": "展开接入信息",
+    "collapse": "收起接入信息",
+    "key": "Key",
+    "copyUrl": "复制 URL",
+    "clientConfig": "客户端配置"
+  },
   "agentActivity": {
     "usage": "用量",
     "requests": "请求",

@@ -2207,6 +2207,14 @@ export default {
     "usage": "Usage",
     "usageTooltip": "Open the Dashboard filtered to this agent"
   },
+  "agentAccess": {
+    "title": "Connection",
+    "expand": "Show connection details",
+    "collapse": "Hide connection details",
+    "key": "Key",
+    "copyUrl": "Copy URL",
+    "clientConfig": "Client config"
+  },
   "agentActivity": {
     "usage": "Usage",
     "requests": "Requests",
