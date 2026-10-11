@@ -408,7 +408,7 @@ const AgentPageContent: React.FC<{ agent: AgentPageDescriptor }> = ({ agent }) =
                 />
 
                 <ScenarioLogDialog open={logOpen} onClose={() => setLogOpen(false)} scenario={scenario} title={t('agentStatus.log')} />
-                <AgentActivityDialog scenario={scenario} view="requests" open={requestsOpen} onClose={() => setRequestsOpen(false)} />
+                <AgentActivityDialog scenario={scenario} open={requestsOpen} onClose={() => setRequestsOpen(false)} />
                 {slotRouting && slots.modeDialog}
                 {setup.kind !== 'none' && setup.renderDialog(slot)}
                 {quickStart && <ConnectAIDialogs flow={connectAI} />}

@@ -2216,22 +2216,15 @@ export default {
   "agentAccess": {
     "title": "Connection",
     "expand": "Show connection details",
-    "collapse": "Hide connection details",
-    "key": "Key",
-    "copyUrl": "Copy URL",
-    "clientConfig": "Client config"
+    "collapse": "Hide connection details"
   },
   "agentActivity": {
-    "usage": "Usage",
     "requests": "Requests",
     "openDashboard": "Open in Dashboard",
     "refresh": "Refresh",
-    "requestsToday": "Requests today",
-    "tokensToday": "Tokens today",
-    "errorsToday": "Errors today",
     "ok": "OK",
     "error": "Error",
-    "empty": "No requests from this agent yet. Once it sends one, today's numbers and the latest requests show up here.",
+    "empty": "No requests from this agent yet. Once it sends one, the latest requests show up here.",
     "loadFailed": "Couldn't load this agent's requests."
   },
   "agentSetup": {
@@ -2292,7 +2285,6 @@ export default {
   },
   "scenarioPage": {
     "slotMode": "Model mode",
-    "lookIn": "Status",
     "setupGuide": "Setup Guide",
     "config": "Config",
     "autoConfig": "Auto Config",

@@ -2207,22 +2207,15 @@ export default {
   "agentAccess": {
     "title": "接入",
     "expand": "展开接入信息",
-    "collapse": "收起接入信息",
-    "key": "Key",
-    "copyUrl": "复制 URL",
-    "clientConfig": "客户端配置"
+    "collapse": "收起接入信息"
   },
   "agentActivity": {
-    "usage": "用量",
     "requests": "请求",
     "openDashboard": "在仪表盘中查看",
     "refresh": "刷新",
-    "requestsToday": "今日请求",
-    "tokensToday": "今日 Token",
-    "errorsToday": "今日错误",
     "ok": "成功",
     "error": "错误",
-    "empty": "这个 Agent 还没有发过请求。收到第一个请求后，今日数据和最近请求会显示在这里。",
+    "empty": "这个 Agent 还没有发过请求。收到第一个请求后，最近请求会显示在这里。",
     "loadFailed": "无法加载该 Agent 的请求。"
   },
   "agentSetup": {
@@ -2283,7 +2276,6 @@ export default {
   },
   "scenarioPage": {
     "slotMode": "模型模式",
-    "lookIn": "状态",
     "setupGuide": "配置指南",
     "config": "配置",
     "autoConfig": "自动配置",
