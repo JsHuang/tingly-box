@@ -344,7 +344,7 @@ const AgentPageContent: React.FC<{ agent: AgentPageDescriptor }> = ({ agent }) =
                     always shown, whether the connection above is folded or not. */}
                 <Card sx={{ borderRadius: 2, border: '1px solid', borderColor: 'divider', boxShadow: 'none', backgroundColor: 'background.paper' }}>
                     {/* Same height and left inset as the folded connection card above. */}
-                    <Box sx={{ px: 1.5, py: 0.5, minHeight: 48, display: 'flex', alignItems: 'center', '& > *': { flex: 1, minWidth: 0 } }}>
+                    <Box sx={{ px: 2, py: 0.5, minHeight: 58, display: 'flex', alignItems: 'center', '& > *': { flex: 1, minWidth: 0 } }}>
                         <PluginFeatures scenario={scenario} />
                     </Box>
                 </Card>

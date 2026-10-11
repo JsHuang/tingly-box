@@ -3,6 +3,8 @@ import { ExpandMore as ExpandMoreIcon } from '@/components/icons';
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { fontMono } from '@/theme/fonts';
+import ConfigRow from '@/components/ConfigRow';
+import { SCENARIO_HEADER_CONTENT_MAX_WIDTH } from './ScenarioCardHeader';
 
 const PREF_KEY = (scenario: string) => `agent-access-expanded-${scenario}`;
 
@@ -90,20 +92,43 @@ export const AgentAccessSection: React.FC<AgentAccessSectionProps> = ({ expanded
                     </ButtonBase>
                 </Tooltip>
             ) : (
+                // The open card's first row, unchanged (same wrappers, same ConfigRow
+                // grid) — only the actions on its right are left out — so folding and
+                // unfolding never moves it. The whole row is the button.
                 <ButtonBase
+                    component="div"
                     className="agent-access-toggle"
                     onClick={onToggle}
                     aria-expanded={false}
                     aria-label={label}
-                    sx={{ display: 'flex', width: '100%', justifyContent: 'space-between', alignItems: 'center', gap: 2, px: 3, py: 1, minHeight: 48, textAlign: 'left', '&:hover': { backgroundColor: 'action.hover' } }}
+                    sx={{ display: 'block', width: '100%', textAlign: 'left', '&:hover': { backgroundColor: 'action.hover' } }}
                 >
-                    <Typography variant="body2" noWrap sx={{ fontFamily: fontMono, color: 'text.primary', minWidth: 0 }}>
-                        {url}
-                    </Typography>
-                    {chevron}
+                    <Box sx={{ pt: 1, pb: 1 }}>
+                        <Box sx={{ maxWidth: SCENARIO_HEADER_CONTENT_MAX_WIDTH }}>
+                            <Box sx={{ px: 2, py: 0.5 }}>
+                                <ConfigRow
+                                    tabs={[{
+                                        key: 'baseUrl',
+                                        label: 'Base URL',
+                                        content: (
+                                            <Typography
+                                                variant="subtitle2"
+                                                sx={{ fontFamily: fontMono, color: 'primary.main', boxSizing: 'border-box', display: 'block', maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', py: 1 }}
+                                            >
+                                                {url}
+                                            </Typography>
+                                        ),
+                                    }]}
+                                    activeTab="baseUrl"
+                                    onTabChange={() => {}}
+                                />
+                            </Box>
+                        </Box>
+                    </Box>
+                    <Box sx={{ position: 'absolute', top: 12, right: 22, p: 0.25, display: 'flex' }}>{chevron}</Box>
                 </ButtonBase>
             )}
-            <Collapse in={expanded} timeout="auto" unmountOnExit>
+            <Collapse in={expanded} timeout={0} unmountOnExit>
                 <Box sx={{ pt: 1, pb: 1 }}>{children}</Box>
             </Collapse>
         </Card>
