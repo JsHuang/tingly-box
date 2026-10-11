@@ -273,8 +273,10 @@ export const UnifiedRoutingGraph: React.FC<UnifiedRoutingGraphProps> = ({
     // lets the resolver consult those declarations; forcing Responses is
     // checked against the current upstream before saving.
     const primaryService = sortedDefaultProviders.find((p) => p.active !== false) || sortedDefaultProviders[0];
-    const showEndpointSelection = !!primaryService
-        && getApiStyle(primaryService.provider) === 'openai';
+    // The Endpoint chip is always shown; it only has an effect when some service
+    // of the rule (default tiers or a smart rule's) is an OpenAI-compatible upstream.
+    const endpointApplicable = [...record.providers, ...(record.smartRouting || []).flatMap((r) => r.services || [])]
+        .some((p) => getApiStyle(p.provider) === 'openai');
     const {
         selection: endpointSelection,
         probing: responsesProbing,
@@ -508,7 +510,8 @@ export const UnifiedRoutingGraph: React.FC<UnifiedRoutingGraphProps> = ({
                 }}
                 endpointSelection={endpointSelection}
                 responsesProbing={responsesProbing}
-                onEndpointSelect={showEndpointSelection ? handleEndpointSelect : undefined}
+                onEndpointSelect={handleEndpointSelect}
+                endpointApplicable={endpointApplicable}
                 pluginsCount={pluginsCount}
                 onPluginsClick={onPluginsClick}
             />

@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState } from 'react';
-import { Box, Button, Stack, Tooltip, Typography } from '@mui/material';
-import { CheckCircle as CheckCircleIcon, Rule as QuickStartIcon } from '@/components/icons';
+import { Box, Button, Card, Stack, Tooltip } from '@mui/material';
+import { Rule as QuickStartIcon } from '@/components/icons';
 import { useNavigate } from 'react-router-dom';
 import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
@@ -243,12 +243,12 @@ const AgentPageContent: React.FC<{ agent: AgentPageDescriptor }> = ({ agent }) =
     const access = useAccessExpanded(scenario, !connected || clientConfigStatus?.state === 'outdated');
 
     const configApplied = clientConfigStatus?.state === 'applied';
-    // Lives in the connection section. Not applied / out of date: the status row
-    // carries the one primary action (Auto Config / Reapply), so this one is plain.
+    // Only the action that matters now is filled: a header link (DSH's Web UI),
+    // else Auto Config until the client's config reads back as applied.
     const configButton = setup.kind !== 'none' && (
         <Button
             onClick={openDialog}
-            variant={clientConfigStatus || quickStart ? 'outlined' : 'contained'}
+            variant={headerLinks?.length || configApplied ? 'outlined' : 'contained'}
             size="small"
         >
             {t(setup.kind === 'auto' ? 'scenarioPage.autoConfig' : 'scenarioPage.setupGuide')}
@@ -271,6 +271,7 @@ const AgentPageContent: React.FC<{ agent: AgentPageDescriptor }> = ({ agent }) =
                     </Button>
                 </Tooltip>
             ))}
+            {configButton}
         </>
     );
 
@@ -306,18 +307,8 @@ const AgentPageContent: React.FC<{ agent: AgentPageDescriptor }> = ({ agent }) =
                 />
                 {/* Connection: always here, between the status row and the rules; open
                     until the agent is connected (or while its config is out of date),
-                    then folded to one line. Plugins and Quick Start stay outside the fold. */}
-                <AgentAccessSection
-                    expanded={access.expanded}
-                    onToggle={access.toggle}
-                    url={accessUrl}
-                    onCopyUrl={() => { void copyToClipboard(accessUrl, `${agent.title} Base URL`); }}
-                    footer={(
-                        <Box sx={{ px: 2, pb: 0.5 }}>
-                            <PluginFeatures scenario={scenario} />
-                        </Box>
-                    )}
-                >
+                    then folded to just the URL. Page-level Plugins are their own card. */}
+                <AgentAccessSection expanded={access.expanded} onToggle={access.toggle} url={accessUrl}>
                     <Box sx={{ maxWidth: SCENARIO_HEADER_CONTENT_MAX_WIDTH }}>
                         <ProviderConfigCard
                             title={connection?.titleKey ? t(connection.titleKey) : agent.title}
@@ -332,11 +323,8 @@ const AgentPageContent: React.FC<{ agent: AgentPageDescriptor }> = ({ agent }) =
                             showApiKeyRow={connection?.apiKeyRow}
                             showBaseUrlRow={connection?.baseUrlRow}
                         />
-                        {/* More rows of the same list: Claude Code's Unified / Separate, and
-                            the client's config (first Auto Config / Setup Guide; its state
-                            and Reapply are in the status row). */}
-                        <Box sx={{ px: 2, py: 0.5 }}>
-                            {slotRouting && (
+                        {slotRouting && (
+                            <Box sx={{ px: 2, py: 0.5 }}>
                                 <ToggleRow label={slotModeLabel}>
                                     <ChoiceToggle<SlotMode>
                                         value={slots.mode}
@@ -347,23 +335,18 @@ const AgentPageContent: React.FC<{ agent: AgentPageDescriptor }> = ({ agent }) =
                                         ariaLabel={slotModeLabel}
                                     />
                                 </ToggleRow>
-                            )}
-                            {configButton && (
-                                <ToggleRow label={t('agentAccess.clientConfig')}>
-                                    <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
-                                        {configButton}
-                                        {configApplied && (
-                                            <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center', color: 'success.main' }}>
-                                                <CheckCircleIcon sx={{ fontSize: 16 }} />
-                                                <Typography variant="caption" sx={{ fontWeight: 500 }}>{t('clientConfigStatus.applied')}</Typography>
-                                            </Stack>
-                                        )}
-                                    </Stack>
-                                </ToggleRow>
-                            )}
-                        </Box>
+                            </Box>
+                        )}
                     </Box>
                 </AgentAccessSection>
+
+                {/* Page-level plugins (Thinking, Vision Proxy, Record): their own card,
+                    always shown, whether the connection above is folded or not. */}
+                <Card sx={{ borderRadius: 2, border: '1px solid', borderColor: 'divider', boxShadow: 'none', backgroundColor: 'background.paper' }}>
+                    <Box sx={{ px: 2, py: 0.5 }}>
+                        <PluginFeatures scenario={scenario} />
+                    </Box>
+                </Card>
 
                 {quickStart && (
                     // Embedded where it always was, above the rules; gone once done.

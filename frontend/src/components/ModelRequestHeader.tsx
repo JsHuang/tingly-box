@@ -129,6 +129,9 @@ export interface ModelRequestHeaderProps {
     endpointSelection?: OpenAIEndpointSelection;
     responsesProbing?: boolean;
     onEndpointSelect?: (selection: OpenAIEndpointSelection) => void;
+    // False when none of the rule's services is OpenAI-compatible: the chip stays
+    // (and works) but its tooltip says it has no effect there.
+    endpointApplicable?: boolean;
     // Plugins are low-frequency: a "Plugins N" tag shows only when the rule
     // has some; adding / removing lives in the rule's "⋯" menu.
     pluginsCount?: number;
@@ -152,6 +155,7 @@ export const ModelRequestHeader: React.FC<ModelRequestHeaderProps> = ({
     endpointSelection = 'auto',
     responsesProbing = false,
     onEndpointSelect,
+    endpointApplicable = true,
     pluginsCount = 0,
     onPluginsClick,
 }) => {
@@ -359,7 +363,7 @@ export const ModelRequestHeader: React.FC<ModelRequestHeaderProps> = ({
 
                 {onEndpointSelect && (
                     <Box sx={{ml: 0.5}} onClick={(e) => e.stopPropagation()}>
-                        <Tooltip title="Choose the upstream OpenAI endpoint for this rule">
+                        <Tooltip title={endpointApplicable ? 'Choose the upstream OpenAI endpoint for this rule' : t('ruleHeader.endpointNotApplicable')}>
                             <span>
                                 <Button
                                     size="small"

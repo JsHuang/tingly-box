@@ -1,4 +1,4 @@
-import { Box, Button, ButtonBase, Card, Collapse, Typography } from '@mui/material';
+import { Box, ButtonBase, Card, Collapse, Typography } from '@mui/material';
 import { ChevronRight as ChevronRightIcon, ExpandMore as ExpandMoreIcon } from '@/components/icons';
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -39,58 +39,39 @@ export interface AgentAccessSectionProps {
     onToggle: () => void;
     /** The full Base URL as the client should use it (Local / Docker applied). */
     url: string;
-    onCopyUrl: () => void;
-    /** The open section: Base URL, API Key, mode switches, config button... */
+    /** The open section: Base URL, API Key, model mode... */
     children: React.ReactNode;
-    /** Always visible, below the folding part (settings used day to day). */
-    footer?: React.ReactNode;
 }
 
 /**
- * The Agent page's connection section, fixed between the status row and the
- * rules. Open: everything needed to point a client at the gateway. Folded:
- * one line — "Connection ▸ <Base URL> · Key ●●●●●● [Copy URL]".
+ * The Agent page's connection card, fixed between the status row and the
+ * rules. Open: the original card (Base URL, API Key, ...). Folded: a single
+ * line — an arrow and the Base URL; the whole line opens it.
  */
-export const AgentAccessSection: React.FC<AgentAccessSectionProps> = ({ expanded, onToggle, url, onCopyUrl, children, footer }) => {
+export const AgentAccessSection: React.FC<AgentAccessSectionProps> = ({ expanded, onToggle, url, children }) => {
     const { t } = useTranslation();
     return (
         <Card
             sx={{ borderRadius: 2, border: '1px solid', borderColor: 'divider', boxShadow: 'none', backgroundColor: 'background.paper' }}
         >
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, px: 2, py: 1, minHeight: 48 }}>
-                <ButtonBase
-                    onClick={onToggle}
-                    aria-expanded={expanded}
-                    aria-label={t(expanded ? 'agentAccess.collapse' : 'agentAccess.expand')}
-                    sx={{ display: 'flex', alignItems: 'center', gap: 0.5, borderRadius: 1, px: 0.5, py: 0.25, flexShrink: 0, '&:hover': { backgroundColor: 'action.hover' } }}
-                >
-                    {expanded ? <ExpandMoreIcon fontSize="small" /> : <ChevronRightIcon fontSize="small" />}
+            <ButtonBase
+                onClick={onToggle}
+                aria-expanded={expanded}
+                aria-label={t(expanded ? 'agentAccess.collapse' : 'agentAccess.expand')}
+                sx={{ display: 'flex', width: '100%', justifyContent: 'flex-start', alignItems: 'center', gap: 0.75, px: 2, py: 1, minHeight: 44, textAlign: 'left', '&:hover': { backgroundColor: 'action.hover' } }}
+            >
+                {expanded ? <ExpandMoreIcon fontSize="small" /> : <ChevronRightIcon fontSize="small" />}
+                {expanded ? (
                     <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>{t('agentAccess.title')}</Typography>
-                </ButtonBase>
-                {!expanded && (
-                    <>
-                        <Typography
-                            variant="body2"
-                            noWrap
-                            title={url}
-                            sx={{ fontFamily: fontMono, color: 'text.primary', minWidth: 0, flex: '0 1 auto' }}
-                        >
-                            {url}
-                        </Typography>
-                        <Typography variant="body2" noWrap sx={{ color: 'text.secondary', flexShrink: 0 }}>
-                            · {t('agentAccess.key')} ●●●●●●
-                        </Typography>
-                        <Box sx={{ flex: 1 }} />
-                        <Button size="small" variant="outlined" onClick={onCopyUrl} sx={{ flexShrink: 0 }}>
-                            {t('agentAccess.copyUrl')}
-                        </Button>
-                    </>
+                ) : (
+                    <Typography variant="body2" noWrap sx={{ fontFamily: fontMono, color: 'text.primary', minWidth: 0 }}>
+                        {url}
+                    </Typography>
                 )}
-            </Box>
+            </ButtonBase>
             <Collapse in={expanded} timeout="auto" unmountOnExit>
                 <Box sx={{ pb: 1 }}>{children}</Box>
             </Collapse>
-            {footer}
         </Card>
     );
 };

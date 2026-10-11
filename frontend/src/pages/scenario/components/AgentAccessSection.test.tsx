@@ -4,27 +4,28 @@ import AgentAccessSection, { useAccessExpanded } from './AgentAccessSection';
 
 // No i18n instance in tests: t() returns the key, which is what we match on.
 describe('AgentAccessSection', () => {
-    it('folds to one line with the URL and a copy button', () => {
-        const onCopyUrl = vi.fn();
+    it('folds to an arrow and the URL; the whole line opens it', () => {
+        const onToggle = vi.fn();
         render(
-            <AgentAccessSection expanded={false} onToggle={vi.fn()} url="http://localhost:1/tingly/x" onCopyUrl={onCopyUrl}>
+            <AgentAccessSection expanded={false} onToggle={onToggle} url="http://localhost:1/tingly/x">
                 <div>details</div>
             </AgentAccessSection>,
         );
         expect(screen.getByText('http://localhost:1/tingly/x')).toBeInTheDocument();
         expect(screen.queryByText('details')).toBeNull();
-        fireEvent.click(screen.getByRole('button', { name: 'agentAccess.copyUrl' }));
-        expect(onCopyUrl).toHaveBeenCalledOnce();
+        // nothing else on the folded line
+        expect(screen.getAllByRole('button')).toHaveLength(1);
+        fireEvent.click(screen.getByRole('button', { name: 'agentAccess.expand' }));
+        expect(onToggle).toHaveBeenCalledOnce();
     });
 
-    it('shows the details, not the one-liner, when open', () => {
+    it('shows the details, not the URL line, when open', () => {
         render(
-            <AgentAccessSection expanded onToggle={vi.fn()} url="http://localhost:1/tingly/x" onCopyUrl={vi.fn()} footer={<div>footer</div>}>
+            <AgentAccessSection expanded onToggle={vi.fn()} url="http://localhost:1/tingly/x">
                 <div>details</div>
             </AgentAccessSection>,
         );
         expect(screen.getByText('details')).toBeInTheDocument();
-        expect(screen.getByText('footer')).toBeInTheDocument();
         expect(screen.queryByText('http://localhost:1/tingly/x')).toBeNull();
     });
 });

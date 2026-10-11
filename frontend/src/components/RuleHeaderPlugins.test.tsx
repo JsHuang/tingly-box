@@ -17,6 +17,16 @@ describe('rule header plugins', () => {
         expect(onPluginsClick).toHaveBeenCalledOnce();
     });
 
+    it('keeps the Endpoint chip (and its menu) even without an OpenAI-compatible upstream', () => {
+        const onEndpointSelect = vi.fn();
+        render(<ModelRequestHeader modelName="m" onEndpointSelect={onEndpointSelect} endpointApplicable={false} />);
+        const chip = screen.getByRole('button', { name: 'OpenAI endpoint: auto' });
+        expect(chip).toBeEnabled();
+        fireEvent.click(chip);
+        fireEvent.click(screen.getByRole('menuitem', { name: /^Chat Always/ }));
+        expect(onEndpointSelect).toHaveBeenCalledWith('chat');
+    });
+
     it('adds / removes plugins from the "⋯" menu', () => {
         const onOpenPlugins = vi.fn();
         render(
