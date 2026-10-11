@@ -316,6 +316,9 @@ export const ModelRequestHeader: React.FC<ModelRequestHeaderProps> = ({
                     </Tooltip>
                 </Box>
 
+                {/* The rule's chips (1M, Endpoint, Plugins) move as one group: when the
+                    row is too narrow they drop to a line of their own, together. */}
+                <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'nowrap' }}>
                 {/* Keep 1M visible; Off only means this rule does not add 1M. */}
                 {onContext1MToggle && (
                     <Box sx={{ml: 0.5}} onClick={(e) => e.stopPropagation()}>
@@ -438,6 +441,7 @@ export const ModelRequestHeader: React.FC<ModelRequestHeaderProps> = ({
                         </Tooltip>
                     </Box>
                 )}
+                </Box>
             </Box>
         );
     };
