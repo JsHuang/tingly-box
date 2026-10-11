@@ -1,12 +1,12 @@
 import { useCallback, useRef, useState } from 'react';
 import { Box, Button, Stack, Tooltip } from '@mui/material';
-import { BarChart as UsageIcon, ListAlt as RequestsIcon, Rule as QuickStartIcon } from '@/components/icons';
+import { Rule as QuickStartIcon } from '@/components/icons';
+import { useNavigate } from 'react-router-dom';
 import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
 import ChoiceToggle from '@/components/ChoiceToggle';
 import ConfigRow from '@/components/ConfigRow';
 import PageHeader from '@/components/PageHeader';
-import { ClientConfigStatusChip } from '@/components/ClientConfigStatusChip';
 import ConnectAIDialogs from '@/components/ConnectAIDialogs';
 import PageLayout from '@/components/PageLayout';
 import ProviderConfigCard from '@/components/ProviderConfigCard.tsx';
@@ -17,7 +17,9 @@ import { ScenarioPageModalProvider } from '@/pages/scenario/context/ScenarioPage
 import { useContext1MToggle } from '@/pages/scenario/hooks/useContext1MToggle';
 import { useScenarioPageInternal } from '@/pages/scenario/hooks/useScenarioPageInternal.ts';
 import { type SlotMode, useSlotRouting } from '@/pages/scenario/hooks/useSlotRouting';
-import AgentActivityDialog, { type AgentActivityView } from './components/AgentActivityDialog';
+import { useAgentObservation } from '@/pages/scenario/hooks/useAgentObservation';
+import AgentActivityDialog from './components/AgentActivityDialog';
+import AgentStatusRow from './components/AgentStatusRow';
 import AgentSetupCard, {
     type AgentApplyResult,
     type AgentInstallAction,
@@ -159,8 +161,11 @@ const AgentPageContent: React.FC<{ agent: AgentPageDescriptor }> = ({ agent }) =
     const [isApplyLoading, setIsApplyLoading] = useState(false);
     // Whether every Quick Start step is done; null until the card has worked it out.
     const [setupDone, setSetupDone] = useState<boolean | null>(null);
-    // Requests and Usage are looks-in opened from the status row, one dialog at a time.
-    const [lookIn, setLookIn] = useState<AgentActivityView | null>(null);
+    // Requests (a dialog) and Usage (the Dashboard, filtered to this agent) are looks-in
+    // from the status row.
+    const [requestsOpen, setRequestsOpen] = useState(false);
+    const navigate = useNavigate();
+    const observation = useAgentObservation(scenario);
     // A finished Quick Start leaves the page; its button in the status row brings it back
     // (and resets it). `reopened` keeps it on show until it is finished again.
     const [quickStartReopened, setQuickStartReopened] = useState(false);
@@ -215,10 +220,27 @@ const AgentPageContent: React.FC<{ agent: AgentPageDescriptor }> = ({ agent }) =
     };
     const openDialog = () => setDialogOpen(true);
 
+    // Until progress is known, an agent that already routes a model counts as done.
+    const setupFinished = setupDone ?? hasModelOnAnyRule(rules);
+    const quickStartHidden = !quickStart || (setupFinished && !quickStartReopened);
+    const slotModeLabel = t('scenarioPage.slotMode', { defaultValue: 'Model mode' });
+    const restartQuickStart = () => {
+        resetSetupProgress(scenario);
+        wasAllDone.current = null;
+        setQuickStartReopened(true);
+        setQuickStartResetKey((k) => k + 1); // remount: the card re-reads its (now empty) progress
+    };
+    // "Connected" is the signal Quick Start already uses (every step done); pages
+    // without a Quick Start have no steps, so for them it is "has sent a request".
+    const connected = quickStart ? setupFinished : !!observation.data?.lastRequestAt;
+
     // Only the action that matters now is filled: a header link (DSH's Web UI),
     // else Auto Config until the client's config reads back as applied.
     const configApplied = clientConfigStatus?.state === 'applied';
-    const configButton = setup.kind !== 'none' && (
+    // Not applied / out of date: the status row carries the one primary action
+    // (Auto Config / Reapply), so this button is not shown twice.
+    const configNeedsAction = !!clientConfigStatus && !configApplied;
+    const configButton = setup.kind !== 'none' && !configNeedsAction && (
         <Button
             onClick={openDialog}
             // One filled button at a time: while the setup row is on the page it carries
@@ -231,6 +253,14 @@ const AgentPageContent: React.FC<{ agent: AgentPageDescriptor }> = ({ agent }) =
     );
     const headerActions = (
         <>
+            {quickStart && quickStartHidden && (
+                // A finished Quick Start leaves the page; this brings it back (reset).
+                <Tooltip title={t('agentSetup.restartTooltip', { defaultValue: 'Run Quick Start again' })}>
+                    <Button onClick={restartQuickStart} variant="text" size="small" startIcon={<QuickStartIcon />} sx={{ textTransform: 'none' }}>
+                        {t('agentSetup.quickStart')}
+                    </Button>
+                </Tooltip>
+            )}
             {headerLinks?.map(link => (
                 <Tooltip key={link.href} title={link.href}>
                     <Button href={link.href} target="_blank" rel="noopener noreferrer" variant="contained" size="small">
@@ -242,18 +272,6 @@ const AgentPageContent: React.FC<{ agent: AgentPageDescriptor }> = ({ agent }) =
         </>
     );
 
-    // Until progress is known, an agent that already routes a model counts as done.
-    const setupFinished = setupDone ?? hasModelOnAnyRule(rules);
-    const quickStartHidden = !quickStart || (setupFinished && !quickStartReopened);
-    const slotModeLabel = t('scenarioPage.slotMode', { defaultValue: 'Model mode' });
-    const statusLabel = t('scenarioPage.lookIn', { defaultValue: 'Status' });
-    const restartQuickStart = () => {
-        resetSetupProgress(scenario);
-        wasAllDone.current = null;
-        setQuickStartReopened(true);
-        setQuickStartResetKey((k) => k + 1); // remount: the card re-reads its (now empty) progress
-    };
-
     return (
         <PageLayout loading={isLoading} loadingContent={<ScenarioPageSkeleton />} notification={notification}>
             <Stack spacing={2}>
@@ -262,7 +280,6 @@ const AgentPageContent: React.FC<{ agent: AgentPageDescriptor }> = ({ agent }) =
                         <ScenarioCardHeader
                             title={agent.title}
                             tooltipKey={agent.tooltipKey}
-                            addon={agent.clientConfigTool && <ClientConfigStatusChip status={clientConfigStatus} onApply={openDialog} />}
                         />
                     }
                     actions={headerActions}
@@ -276,12 +293,18 @@ const AgentPageContent: React.FC<{ agent: AgentPageDescriptor }> = ({ agent }) =
                         '& h1': { whiteSpace: 'nowrap' },
                     }}
                 />
-                {/* The header card: how this tool connects (Base URL, API Key, Plugins)
-                    and, as the last row of the same list, three looks at it, each a
-                    button that opens its own dialog — Quick Start (leads until it is
-                    done, then moves to the end), Requests and Usage. Unified /
-                    Separate chooses how the model rules below are laid out, so it
-                    ends this row. */}
+                <AgentStatusRow
+                    observation={observation.data}
+                    connected={connected}
+                    configStatus={clientConfigStatus}
+                    onApplyConfig={openDialog}
+                    onOpenRequests={() => setRequestsOpen(true)}
+                    // The Dashboard already opens filtered to one agent (?scenario=).
+                    onOpenUsage={() => navigate(`/dashboard/today?scenario=${encodeURIComponent(scenario)}`)}
+                />
+                {/* The header card: how this tool connects (Base URL, API Key, Plugins).
+                    Unified / Separate chooses how the model rules below are laid out,
+                    so it ends the list. Requests / Usage live in the status row above. */}
                 <UnifiedCard size="full" contentMaxWidth={SCENARIO_HEADER_CONTENT_MAX_WIDTH}>
                     <ProviderConfigCard
                         title={connection?.titleKey ? t(connection.titleKey) : agent.title}
@@ -309,29 +332,6 @@ const AgentPageContent: React.FC<{ agent: AgentPageDescriptor }> = ({ agent }) =
                                 />
                             </ToggleRow>
                         )}
-                        <ToggleRow label={statusLabel}>
-                            {/* None is ever selected: each option just opens something. Quick
-                                Start is not a dialog — it sits above the rules while there is
-                                setup to do and leaves when done — so its option exists only
-                                while hidden, and brings it back, reset. */}
-                            <ChoiceToggle<'requests' | 'usage' | 'quickstart' | ''>
-                                value=""
-                                optionWidth={100}
-                                flush
-                                ariaLabel={statusLabel}
-                                onChange={(next) => {
-                                    if (next === 'quickstart') restartQuickStart();
-                                    else if (next) setLookIn(next);
-                                }}
-                                options={[
-                                    { value: 'requests', label: t('agentActivity.requests'), icon: <RequestsIcon /> },
-                                    { value: 'usage', label: t('agentActivity.usage'), icon: <UsageIcon /> },
-                                    ...(quickStart && quickStartHidden
-                                        ? [{ value: 'quickstart' as const, label: t('agentSetup.quickStart'), icon: <QuickStartIcon />, tooltip: t('agentSetup.restartTooltip', { defaultValue: 'Run Quick Start again' }) }]
-                                        : []),
-                                ]}
-                            />
-                        </ToggleRow>
                     </Box>
                 </UnifiedCard>
 
@@ -389,8 +389,7 @@ const AgentPageContent: React.FC<{ agent: AgentPageDescriptor }> = ({ agent }) =
                     {...(agent.context1M ? { onContext1MToggle: context1M.handleContext1MToggle } : {})}
                 />
 
-                <AgentActivityDialog scenario={scenario} view="usage" open={lookIn === 'usage'} onClose={() => setLookIn(null)} />
-                <AgentActivityDialog scenario={scenario} view="requests" open={lookIn === 'requests'} onClose={() => setLookIn(null)} />
+                <AgentActivityDialog scenario={scenario} view="requests" open={requestsOpen} onClose={() => setRequestsOpen(false)} />
                 {slotRouting && slots.modeDialog}
                 {setup.kind !== 'none' && setup.renderDialog(slot)}
                 {quickStart && <ConnectAIDialogs flow={connectAI} />}

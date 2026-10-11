@@ -2221,6 +2221,24 @@ export default {
     "test": "Проверить",
     "ruleActions": "Действия с правилом"
   },
+  "agentStatus": {
+    "connected": "Подключено",
+    "lastRequest": "Последний запрос: {{ago}}",
+    "today_one": "{{count}} запрос сегодня",
+    "today_few": "{{count}} запроса сегодня",
+    "today_many": "{{count}} запросов сегодня",
+    "today_other": "{{count}} запросов сегодня",
+    "errorRate": "Доля ошибок {{rate}}",
+    "noRequestsYet": "Запросов пока нет",
+    "noRequestsFinishSetup": "Запросов пока нет · завершите подключение ниже",
+    "stale_one": "Конфигурация устарела · {{count}} отличие",
+    "stale_few": "Конфигурация устарела · {{count}} отличия",
+    "stale_many": "Конфигурация устарела · {{count}} отличий",
+    "stale_other": "Конфигурация устарела · {{count}} отличия",
+    "requests": "Запросы",
+    "usage": "Использование",
+    "usageTooltip": "Открыть панель, отфильтрованную по этому агенту"
+  },
   "agentActivity": {
     "usage": "Использование",
     "requests": "Запросы",
