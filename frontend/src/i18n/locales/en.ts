@@ -65,6 +65,7 @@ export default {
       "useClaudeDesktop": "Claude Desktop",
       "useOpenCode": "OpenCode",
       "usePi": "Pi",
+      "useWorkBuddy": "WorkBuddy",
       "useDsh": "DeepSeek",
       "useXcode": "Xcode",
       "useVSCode": "VS Code",
@@ -2287,6 +2288,7 @@ export default {
       "vscode": "Bring Your Own Key: Use your own API keys with VS Code Copilot through Tingly Box proxy",
       "cursor": "Cursor AI code editor through Tingly Box proxy, with Cursor compatibility handling enabled by default. Cursor calls this URL from its own cloud, so it must be a publicly reachable HTTPS address — not localhost.",
       "pi": "Pi coding agent through Tingly Box proxy",
+      "workbuddy": "Tencent WorkBuddy through Tingly Box proxy, added as a custom OpenAI-compatible model",
       "dsh": "DeepSeek Harness (dsh) agent harness through Tingly Box proxy",
       "imagegen": "AI-powered image generation and editing through Tingly Box proxy with multiple model support"
     },
@@ -2308,6 +2310,23 @@ export default {
       "openGuide": "View Config",
       "configTitle": "Configure Pi",
       "modalDescription": "Point pi's provider base URL and API key at the values shown on this page, then check the repo below for pi's exact configuration options."
+    },
+    "workbuddy": {
+      "installDescription": "Install Tencent WorkBuddy on your computer. Tingly Box plugs in through WorkBuddy's custom model setting — no WorkBuddy sign-in is involved.",
+      "viewDocs": "WorkBuddy model docs",
+      "applyStepLabel": "Add a custom model",
+      "applyStepDescription": "In WorkBuddy, add a Custom model that points at the URL and API key above.",
+      "openGuide": "View Steps",
+      "configTitle": "Configure WorkBuddy",
+      "step1": "Open WorkBuddy → Settings → Model → Add model, and set the provider to Custom.",
+      "step2": "Enter these values. The URL must be the full path ending in /chat/completions:",
+      "labelUrl": "URL",
+      "labelApiKey": "API Key",
+      "labelModel": "Model ID",
+      "modelPlaceholder": "a request model from the Model Rules on this page",
+      "capabilityNote": "Tick Tool calling. Tick Image input or Reasoning only if the model your rule routes to supports them — wrong flags can cause call errors.",
+      "restartNote": "Save, then pick the model under the Custom group in the chat model picker. If it doesn't appear, restart WorkBuddy.",
+      "fileNote": "Prefer a file? Add this to ~/.workbuddy/models.json (C:\\Users\\<you>\\.workbuddy\\models.json on Windows):"
     },
     "dsh": {
       "openWebUi": "Open Web UI",
@@ -2353,6 +2372,7 @@ export default {
       "vscode": "Power VS Code Copilot Chat through Tingly Box.",
       "cursor": "Bring your model into Cursor with compatibility handling built in.",
       "pi": "Route the pi coding agent through your provider.",
+      "workbuddy": "Use your own models in Tencent WorkBuddy as a custom model.",
       "dsh": "Route the dsh coding agent through your provider.",
       "openai": "Drop-in OpenAI-compatible SDK endpoint.",
       "anthropic": "Drop-in Anthropic-compatible SDK endpoint.",

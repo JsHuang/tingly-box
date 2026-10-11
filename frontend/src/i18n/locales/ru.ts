@@ -67,6 +67,7 @@ export default {
       "useClaudeDesktop": "Claude Desktop",
       "useOpenCode": "OpenCode",
       "usePi": "Pi",
+      "useWorkBuddy": "WorkBuddy",
       "useDsh": "DeepSeek",
       "useXcode": "Xcode",
       "useVSCode": "VS Code",
@@ -2315,6 +2316,7 @@ export default {
       "vscode": "Свои ключи: используйте собственные API-ключи в VS Code Copilot через прокси Tingly Box",
       "cursor": "Редактор кода Cursor через прокси Tingly Box с включённой по умолчанию совместимостью с Cursor. Cursor обращается к этому адресу со своих облачных серверов, поэтому он должен быть публично доступен по HTTPS, а не localhost.",
       "pi": "Агент программирования Pi через прокси Tingly Box",
+      "workbuddy": "Tencent WorkBuddy через прокси Tingly Box как пользовательская OpenAI-совместимая модель",
       "dsh": "Агентная оболочка DeepSeek Harness (dsh) через прокси Tingly Box",
       "imagegen": "Генерация и редактирование изображений через прокси Tingly Box с поддержкой нескольких моделей"
     },
@@ -2336,6 +2338,23 @@ export default {
       "openGuide": "Посмотреть конфиг",
       "configTitle": "Настройка Pi",
       "modalDescription": "Укажите в pi base URL провайдера и API-ключ, показанные на этой странице, а точные параметры конфигурации смотрите в репозитории ниже."
+    },
+    "workbuddy": {
+      "installDescription": "Установите Tencent WorkBuddy на свой компьютер. Tingly Box подключается через настройку пользовательской модели WorkBuddy — вход в аккаунт WorkBuddy не требуется.",
+      "viewDocs": "Документация WorkBuddy по моделям",
+      "applyStepLabel": "Добавить пользовательскую модель",
+      "applyStepDescription": "В WorkBuddy добавьте модель Custom с URL и API-ключом, указанными выше.",
+      "openGuide": "Показать шаги",
+      "configTitle": "Настройка WorkBuddy",
+      "step1": "Откройте WorkBuddy → Settings → Model → Add model и выберите провайдера Custom.",
+      "step2": "Введите значения ниже. URL должен быть полным путём, заканчивающимся на /chat/completions:",
+      "labelUrl": "URL",
+      "labelApiKey": "API-ключ",
+      "labelModel": "ID модели",
+      "modelPlaceholder": "модель запроса из правил моделей на этой странице",
+      "capabilityNote": "Отметьте Tool calling. Image input и Reasoning отмечайте, только если их поддерживает модель, на которую ведёт правило — неверные флаги могут вызвать ошибки.",
+      "restartNote": "Сохраните и выберите модель в группе Custom в списке моделей чата. Если её нет, перезапустите WorkBuddy.",
+      "fileNote": "Предпочитаете файл? Добавьте это в ~/.workbuddy/models.json (C:\\Users\\<вы>\\.workbuddy\\models.json в Windows):"
     },
     "dsh": {
       "openWebUi": "Открыть веб-интерфейс",
@@ -2381,6 +2400,7 @@ export default {
       "vscode": "Работа VS Code Copilot Chat через Tingly Box.",
       "cursor": "Подключите свою модель к Cursor со встроенной совместимостью.",
       "pi": "Направьте агент программирования pi через вашего провайдера.",
+      "workbuddy": "Используйте свои модели в Tencent WorkBuddy как пользовательскую модель.",
       "dsh": "Направьте агент программирования dsh через вашего провайдера.",
       "openai": "Готовый эндпоинт, совместимый с OpenAI SDK.",
       "anthropic": "Готовый эндпоинт, совместимый с Anthropic SDK.",

@@ -21,6 +21,7 @@ import {
     OpenCode,
     Pi,
     VSCode,
+    WorkBuddy,
     Xcode,
 } from '@/components/BrandIcons';
 
@@ -73,6 +74,14 @@ export const SCENARIOS: ScenarioDescriptor[] = [
         descKey: 'scenarioOverview.descriptions.pi',
         path: '/agent/pi',
         icon: (size) => <Pi size={size} />,
+        hideable: true,
+    },
+    {
+        id: 'workbuddy',
+        labelKey: 'layout.nav.useWorkBuddy',
+        descKey: 'scenarioOverview.descriptions.workbuddy',
+        path: '/agent/workbuddy',
+        icon: (size) => <WorkBuddy size={size} />,
         hideable: true,
     },
     {
@@ -191,10 +200,13 @@ const VISIBILITY_EVENT = 'scenario-visibility-change';
 // tingly-box is reachable over a public HTTPS URL (real deployment, or a
 // tunnel). See .design/cursor.md. Un-hide once we can detect/guide this
 // better, e.g. warn inline when baseUrl looks like localhost/a private IP.
-const DEFAULT_HIDDEN = ['custom', 'pi', 'cursor'];
+// "workbuddy" is hidden by default for the same reason as "pi": its custom-model
+// config (UI + ~/.workbuddy/models.json) is documented only by third parties
+// and not yet verified end to end. See .design/workbuddy-oauth.md.
+const DEFAULT_HIDDEN = ['custom', 'pi', 'cursor', 'workbuddy'];
 // Bump this whenever DEFAULT_HIDDEN gains a genuinely new entry, so existing
 // users pick up the new default without losing their own customisations.
-const DEFAULTS_VERSION = 5;
+const DEFAULTS_VERSION = 6;
 
 // Scenario ids renamed in place (old -> new). A user's existing hidden/shown
 // choice for the old id carries over to the new one below, instead of being

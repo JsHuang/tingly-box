@@ -900,6 +900,17 @@ const mockV1Rules: Record<string, any[]> = {
             services: [{ uuid: 'svc-vs1', provider: 'mock-provider-anthropic', model: 'claude-sonnet-5', weight: 1, active: true }],
         },
     ],
+    workbuddy: [
+        {
+            uuid: 'mock-rule-wb-1',
+            scenario: 'workbuddy',
+            request_model: 'claude-sonnet-5',
+            response_model: '',
+            active: true,
+            description: '',
+            services: [{ uuid: 'svc-wb1', provider: 'mock-provider-zai', model: 'glm-5.1', weight: 1, active: true }],
+        },
+    ],
     xcode: [
         {
             uuid: 'mock-rule-xc-1',

@@ -135,6 +135,9 @@ export const Xcode = createBrandIcon(XcodeSvg, 'Xcode', true);
 export const VSCode = createBrandIcon(VSCodeSvg, 'VS Code', true);
 export const Cursor = createBrandIcon(CursorSvg, 'Cursor', false, true);
 export const Pi = createBrandIcon(PiSvg, 'Pi', false, true);
+// WorkBuddy is Tencent's agent; no dedicated mark ships in lobehub, so it
+// borrows the Tencent one (TencentSvg is imported further up).
+export const WorkBuddy = createBrandIcon(TencentSvg, 'WorkBuddy', false, true);
 
 // Tingly-Box's own mark (full colour, so no dark-mode inversion). Marks a
 // provider that is itself another Tingly-Box gateway.
