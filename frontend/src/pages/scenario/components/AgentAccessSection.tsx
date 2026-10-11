@@ -1,5 +1,5 @@
-import { Box, ButtonBase, Card, Collapse, Typography } from '@mui/material';
-import { ChevronRight as ChevronRightIcon, ExpandMore as ExpandMoreIcon } from '@/components/icons';
+import { Box, ButtonBase, Card, Collapse, Tooltip, Typography } from '@mui/material';
+import { ExpandMore as ExpandMoreIcon } from '@/components/icons';
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { fontMono } from '@/theme/fonts';
@@ -46,31 +46,65 @@ export interface AgentAccessSectionProps {
 /**
  * The Agent page's connection card, fixed between the status row and the
  * rules. Open: the original card (Base URL, API Key, ...). Folded: a single
- * line — an arrow and the Base URL; the whole line opens it.
+ * line with the Base URL; the whole line opens it. The fold chevron sits at
+ * the card's right edge, as on the rule cards.
  */
 export const AgentAccessSection: React.FC<AgentAccessSectionProps> = ({ expanded, onToggle, url, children }) => {
     const { t } = useTranslation();
+    const label = t(expanded ? 'agentAccess.collapse' : 'agentAccess.expand');
+    // The same fold control as the rule card's header (ModelRequestHeader): a
+    // chevron, turned over while open, grey until hovered.
+    const chevron = (
+        <ExpandMoreIcon
+            sx={{
+                transition: 'transform 0.2s',
+                transform: expanded ? 'rotate(180deg)' : 'rotate(0deg)',
+                fontSize: '1.1rem',
+                color: 'text.secondary',
+                flexShrink: 0,
+            }}
+        />
+    );
     return (
         <Card
-            sx={{ borderRadius: 2, border: '1px solid', borderColor: 'divider', boxShadow: 'none', backgroundColor: 'background.paper' }}
+            sx={{
+                position: 'relative',
+                borderRadius: 2,
+                border: '1px solid',
+                borderColor: 'divider',
+                boxShadow: 'none',
+                backgroundColor: 'background.paper',
+                '& .agent-access-toggle:hover svg': { color: 'text.primary' },
+            }}
         >
-            <ButtonBase
-                onClick={onToggle}
-                aria-expanded={expanded}
-                aria-label={t(expanded ? 'agentAccess.collapse' : 'agentAccess.expand')}
-                sx={{ display: 'flex', width: '100%', justifyContent: 'flex-start', alignItems: 'center', gap: 0.75, px: 2, py: 1, minHeight: 44, textAlign: 'left', '&:hover': { backgroundColor: 'action.hover' } }}
-            >
-                {expanded ? <ExpandMoreIcon fontSize="small" /> : <ChevronRightIcon fontSize="small" />}
-                {expanded ? (
-                    <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>{t('agentAccess.title')}</Typography>
-                ) : (
+            {expanded ? (
+                <Tooltip title={label}>
+                    <ButtonBase
+                        className="agent-access-toggle"
+                        onClick={onToggle}
+                        aria-expanded
+                        aria-label={label}
+                        sx={{ position: 'absolute', top: 12, right: 22, zIndex: 1, p: 0.25, borderRadius: 1 }}
+                    >
+                        {chevron}
+                    </ButtonBase>
+                </Tooltip>
+            ) : (
+                <ButtonBase
+                    className="agent-access-toggle"
+                    onClick={onToggle}
+                    aria-expanded={false}
+                    aria-label={label}
+                    sx={{ display: 'flex', width: '100%', justifyContent: 'space-between', alignItems: 'center', gap: 2, px: 3, py: 1, minHeight: 48, textAlign: 'left', '&:hover': { backgroundColor: 'action.hover' } }}
+                >
                     <Typography variant="body2" noWrap sx={{ fontFamily: fontMono, color: 'text.primary', minWidth: 0 }}>
                         {url}
                     </Typography>
-                )}
-            </ButtonBase>
+                    {chevron}
+                </ButtonBase>
+            )}
             <Collapse in={expanded} timeout="auto" unmountOnExit>
-                <Box sx={{ pb: 1 }}>{children}</Box>
+                <Box sx={{ pt: 1, pb: 1 }}>{children}</Box>
             </Collapse>
         </Card>
     );
