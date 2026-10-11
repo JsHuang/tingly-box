@@ -27,6 +27,30 @@
   子 module（`ai imbot agentboot afk swagger`）测试也全部通过。
 - 另有一个"只给协议层用"的 **types-only 变体**（见下）：genai 缩到 **2,772 行、1 个依赖**。
 
+## 裁剪后是否正常可用（验证记录）
+
+两层证据，都在 `libs/*` 上从干净状态用 `reproduce.sh` 裁剪后得到：
+
+1. **使用方验证**：tingly-box `go build ./...`、`go vet ./...`、`go test ./... -count=1` 全部通过，子 module（`ai imbot agentboot afk swagger`）测试通过。
+   协议层转换测试大量构造/解析 SDK 的请求、响应和流式事件类型，是对"保留部分行为不变"最直接的验证。
+2. **差分验证**（`scripts/sdk-slim/verify/`）：把上游自带的测试文件放回裁剪后的树，丢掉引用了已被裁掉符号的文件，
+   对剩下的测试，与**未裁剪的原始 submodule** 里同名测试逐个对比结果。
+
+| SDK | 裁剪后仍可编译的测试 | 与原版同名测试结果一致 | 退化（原版过、裁剪后挂） |
+|---|---|---|---|
+| openai-go | 335 | 332 通过 + 3 同样失败 | **0** |
+| anthropic-sdk-go | 1,091 | 1,088 通过 + 2 跳过 + 1 同样失败 | **0** |
+| go-genai | 352 | 346 通过 + 6 跳过 | **0** |
+
+那 4 个"同样失败"在原版里也失败，与裁剪无关：openai 的 `TestStreamingAccumulatorWithToolCalls` 需要本地 mock 服务（`localhost:4010`）、
+`TestChatCompletionMessageConversionUsesCurrentFields/decoded` 的 JSON key 顺序断言；anthropic 的 `TestLoadConfig_EnvFillsMissingWorkspaceID` 会真实访问 OAuth 服务。
+
+这些差分测试主要覆盖**底层机制**：`apijson`/`apiform`/`apiquery` 编解码、union 解码、SSE、`param`、请求构造、option、genai 的类型与转换。
+上游针对被裁掉的 API 面的测试（openai 约 2,400 个、anthropic 约 1,800 个、genai 约 290 个）无法编译，没有被验证——它们对应的正是我们不用的接口。
+
+**没有被证明的**：被保留的 API 面里，上游没写测试、tingly-box 也没覆盖到的路径；反射或接口隐式满足导致的运行时依赖（见"局限"）。
+凡是裁剪结果要给第三方用，应当把 `surface/` 白名单对应的行为补成测试。
+
 ## 关键发现
 
 1. **genai 的"重依赖"副作用几乎全是一个很小的 patch 就能消掉。**
@@ -90,6 +114,7 @@ scripts/sdk-slim/
   surfacegen/   从入口代码生成 surface/surface.go
   patches/genai-no-auth.patch
   reproduce.sh  genai-types-only.sh
+  verify/       restore_tests.py（把上游测试放回并剔除不能编译的）、diff_tests.py（与未裁剪版本逐测试对比）
 ```
 
 工具各自是独立 module（`GOWORK=off go build`），不在 tingly-box 的 go.work 里。
