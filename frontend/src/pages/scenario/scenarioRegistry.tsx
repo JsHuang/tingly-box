@@ -200,13 +200,10 @@ const VISIBILITY_EVENT = 'scenario-visibility-change';
 // tingly-box is reachable over a public HTTPS URL (real deployment, or a
 // tunnel). See .design/cursor.md. Un-hide once we can detect/guide this
 // better, e.g. warn inline when baseUrl looks like localhost/a private IP.
-// "workbuddy" is hidden by default for the same reason as "pi": its custom-model
-// config (UI + ~/.workbuddy/models.json) is documented only by third parties
-// and not yet verified end to end. See .design/workbuddy-oauth.md.
-const DEFAULT_HIDDEN = ['custom', 'pi', 'cursor', 'workbuddy'];
+const DEFAULT_HIDDEN = ['pi', 'cursor'];
 // Bump this whenever DEFAULT_HIDDEN gains a genuinely new entry, so existing
 // users pick up the new default without losing their own customisations.
-const DEFAULTS_VERSION = 6;
+const DEFAULTS_VERSION = 7;
 
 // Scenario ids renamed in place (old -> new). A user's existing hidden/shown
 // choice for the old id carries over to the new one below, instead of being
@@ -252,6 +249,10 @@ const readHidden = (): string[] => {
             // default-hidden value once so existing installs see the new
             // Team / tN / Add Team structure without manual discovery.
             if (storedVersion < 4) stored = stored.filter((id) => id !== 'team');
+            // "custom" and "workbuddy" became shown-by-default (v7). Drop the old
+            // default-hidden "custom" once; anything the user hides afterwards
+            // is stored explicitly and stays hidden.
+            if (storedVersion < 7) stored = stored.filter((id) => id !== 'custom' && id !== 'workbuddy');
             const renamedTargets = new Set(Object.values(RENAMED_SCENARIO_IDS));
             const genuinelyNewDefaults = DEFAULT_HIDDEN.filter((id) => !renamedTargets.has(id));
             const merged = Array.from(new Set([...stored, ...genuinelyNewDefaults]));

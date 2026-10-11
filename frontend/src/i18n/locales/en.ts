@@ -2326,7 +2326,6 @@ export default {
       "modelPlaceholder": "a request model from the Model Rules on this page",
       "capabilityNote": "Tick Tool calling. Tick Image input or Reasoning only if the model your rule routes to supports them — wrong flags can cause call errors.",
       "restartNote": "Save, then pick the model under the Custom group in the chat model picker. If it doesn't appear, restart WorkBuddy.",
-      "fileNote": "Prefer a file? Add this to ~/.workbuddy/models.json (C:\\Users\\<you>\\.workbuddy\\models.json on Windows):"
     },
     "dsh": {
       "openWebUi": "Open Web UI",

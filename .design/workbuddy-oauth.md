@@ -211,22 +211,26 @@ OAuth. Same shape as Pi/Xcode: a scenario + a guide page.
   i18n (en/zh/ru), icon (`assets/icons/workbuddy.svg`, the official logo from
   workbuddy.ai, full colour), guardrail scope label, mock rule.
 - **User-facing steps:** WorkBuddy → Settings → Model → Add model → Custom;
-  URL = `{base}/tingly/workbuddy/v1/chat/completions` (WorkBuddy requires the
-  *full* path and does not append one), API key = Tingly-Box token, Model ID = a
-  request model from Model Rules; tick *Tool calling* only unless the routed
-  model supports images/reasoning. File alternative: `~/.workbuddy/models.json`
-  with `{"models":[{id,name,vendor:"Custom",url,apiKey,supportsToolCall,…}]}`.
-- **Hidden by default** (`DEFAULT_HIDDEN`, `DEFAULTS_VERSION` 5→6), like `pi`:
-  the setup is documented only by third parties (apiyi, cloudbase) and has not
-  been verified end to end against a real WorkBuddy install. Remove from
-  `DEFAULT_HIDDEN` once verified.
-- **Unverified:** whether WorkBuddy desktop reads `~/.workbuddy/models.json`
-  with exactly this schema (CodeBuddy CLI documents `~/.codebuddy/models.json`;
-  the `.workbuddy` path comes from a CloudBase guide); whether a restart is
-  needed after UI edits; SSE/tool-call behaviour against the routed models.
-- **Not done:** no auto-config (writing `models.json` for the user). Possible
-  follow-up once the schema is verified, using the `OpenCode`/`DSH` auto-config
-  pattern and the client-config-status chip.
+  URL = `{base}/tingly/workbuddy/v1/chat/completions`, API key = Tingly-Box
+  token, Model ID = a request model from Model Rules; tick *Tool calling* only
+  unless the routed model supports images/reasoning. This is the path WorkBuddy's
+  own docs describe (Settings UI; with "Custom Protocol" off it validates /
+  completes the `/chat/completions` path).
+- **Shown by default** (v7 of the hidden-agents defaults; `custom` too). A
+  one-time migration clears `custom`/`workbuddy` from stored hidden lists; hiding
+  them afterwards is stored explicitly and respected.
+- **No file-based config, and no auto-config — deliberately.** The official
+  WorkBuddy doc says the UI needs "no configuration file editing" and mentions
+  only the *legacy* `~/.codebuddy/models.json` (still honoured, migrated into the
+  UI). The Tencent Cloud doc says "`workbuddy/models.json`" (no leading dot).
+  `~/.workbuddy/models.json` appears only in third-party guides (apiyi, CloudBase,
+  LongCat, CSDN), which also disagree on the top-level shape (`{"models":[…]}`
+  vs a bare array) and on whether a full restart is needed. Until Tencent
+  documents the file the desktop app actually reads and writes, writing it for
+  the user could silently do nothing or clobber their config, so the guide
+  shows UI steps only. Revisit auto-config (OpenCode/DSH pattern +
+  client-config-status chip) if/when that is confirmed on a real install.
+- **Unverified end to end:** SSE/tool-call behaviour against the routed models.
 
 ## Sources
 

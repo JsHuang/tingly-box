@@ -2354,7 +2354,6 @@ export default {
       "modelPlaceholder": "модель запроса из правил моделей на этой странице",
       "capabilityNote": "Отметьте Tool calling. Image input и Reasoning отмечайте, только если их поддерживает модель, на которую ведёт правило — неверные флаги могут вызвать ошибки.",
       "restartNote": "Сохраните и выберите модель в группе Custom в списке моделей чата. Если её нет, перезапустите WorkBuddy.",
-      "fileNote": "Предпочитаете файл? Добавьте это в ~/.workbuddy/models.json (C:\\Users\\<вы>\\.workbuddy\\models.json в Windows):"
     },
     "dsh": {
       "openWebUi": "Открыть веб-интерфейс",

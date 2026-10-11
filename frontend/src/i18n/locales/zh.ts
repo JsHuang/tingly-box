@@ -2319,7 +2319,6 @@ export default {
       "modelPlaceholder": "本页「模型规则」中的请求模型名",
       "capabilityNote": "勾选「工具调用」。只有当规则路由到的模型支持时，才勾选「图片输入」或「推理」——勾错可能导致调用报错。",
       "restartNote": "保存后，在对话的模型选择器里「自定义」分组下选择该模型；若没有出现，请重启 WorkBuddy。",
-      "fileNote": "也可以直接编辑文件：把下面内容加入 ~/.workbuddy/models.json（Windows 为 C:\\Users\\<你>\\.workbuddy\\models.json）："
     },
     "dsh": {
       "openWebUi": "打开 Web UI",

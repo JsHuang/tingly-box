@@ -1,4 +1,4 @@
-import { Box, Dialog, DialogActions, DialogContent, DialogTitle, Button, Typography, Stack } from '@mui/material';
+import { Dialog, DialogActions, DialogContent, DialogTitle, Button, Typography, Stack } from '@mui/material';
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { useScenarioPageModal } from '@/pages/scenario/context/ScenarioPageContext';
@@ -21,31 +21,11 @@ const WorkBuddyConfigModal: React.FC<WorkBuddyConfigModalProps> = ({
 }) => {
     const { t } = useTranslation();
     const { token } = useScenarioPageModal();
-    // WorkBuddy does not append a path: the URL it is given is the complete
-    // chat-completions endpoint.
+    // Give the complete chat-completions endpoint. WorkBuddy validates / completes
+    // a bare base URL when "Custom Protocol" is off, but a full path is correct
+    // either way.
     const url = `${baseUrl}/tingly/workbuddy/v1/chat/completions`;
     const modelPlaceholder = t('scenarioPage.workbuddy.modelPlaceholder');
-    // Shown masked (like the other agent modals); the copy button uses the real key.
-    const buildModelsJson = (apiKey: string) =>
-        JSON.stringify(
-            {
-                models: [
-                    {
-                        id: modelPlaceholder,
-                        name: 'Tingly Box',
-                        vendor: 'Custom',
-                        url,
-                        apiKey,
-                        supportsToolCall: true,
-                        supportsImages: false,
-                        supportsReasoning: false,
-                    },
-                ],
-            },
-            null,
-            2,
-        );
-
     return (
         <Dialog
             open={open}
@@ -87,33 +67,6 @@ const WorkBuddyConfigModal: React.FC<WorkBuddyConfigModalProps> = ({
                     <Typography variant="body2" sx={{ color: 'text.secondary' }}>
                         {t('scenarioPage.workbuddy.restartNote')}
                     </Typography>
-
-                    <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                        {t('scenarioPage.workbuddy.fileNote')}
-                    </Typography>
-                    <Box
-                        component="pre"
-                        sx={{
-                            m: 0,
-                            p: 1.5,
-                            borderRadius: 1,
-                            border: 1,
-                            borderColor: 'divider',
-                            bgcolor: 'background.paper',
-                            fontFamily: fontMono,
-                            fontSize: 11.5,
-                            overflowX: 'auto',
-                        }}
-                    >
-                        {buildModelsJson(`${token.slice(0, 16)}...`)}
-                    </Box>
-                    <Button
-                        variant="outlined"
-                        size="small"
-                        onClick={() => copyToClipboard(buildModelsJson(token), 'models.json')}
-                    >
-                        {t('common.copy', { defaultValue: 'Copy' })} models.json
-                    </Button>
                 </Stack>
             </DialogContent>
             <DialogActions sx={{ px: 3, pb: 2, pt: 1 }}>
