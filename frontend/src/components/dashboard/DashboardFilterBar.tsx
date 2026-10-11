@@ -48,6 +48,11 @@ const GROUP_SUBHEADER_SX = {
     backgroundColor: 'action.hover',
 } as const;
 
+// Container width below which the toolbar stacks into two rows, and below which
+// the filters go 2x2. Measured: all controls plus the clear button fit in ~830px of content width.
+const TOOLBAR_STACK_PX = 830;
+const TOOLBAR_GRID2_PX = 519;
+
 const TIME_RANGES = Object.keys(TIME_RANGE_CONFIG) as TimeRange[];
 
 // Every select in the bar shares this size so the row stays compact.
@@ -133,187 +138,228 @@ export default function DashboardFilterBar({
     );
 
     return (
-        <Paper
-            variant="outlined"
-            sx={{
-                display: 'flex',
-                flexWrap: 'wrap',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                columnGap: 2,
-                rowGap: 1.5,
-                px: 1.5,
-                py: 1,
-                borderRadius: 2,
-            }}
-        >
-            {/* Filters: stay on one row while they fit, wrap among themselves otherwise. */}
-            <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 1, minWidth: 0 }}>
-                <FormControl size="small" sx={{ width: { xs: 140, md: 122 } }}>
-                    <InputLabel sx={{ fontWeight: 500, fontSize: '0.875rem' }}>{t('dashboard.overview.agent', { defaultValue: 'Agent' })}</InputLabel>
-                    <Select
-                        value={selectedScenario}
-                        label={t('dashboard.overview.agent', { defaultValue: 'Agent' })}
-                        onChange={(e) => onScenarioChange(e.target.value)}
-                        sx={SELECT_SX}
-                    >
-                        <MenuItem value="all">{t('dashboard.overview.allAgents', { defaultValue: 'All agents' })}</MenuItem>
-                        {agentOptions.map((o) => (
-                            <MenuItem key={o.scenario} value={o.scenario}>
-                                {scenarioLabel(t, o.scenario)}
-                            </MenuItem>
-                        ))}
-                    </Select>
-                </FormControl>
-
-                <FormControl size="small" sx={{ width: { xs: 140, md: 132 } }}>
-                    <InputLabel sx={{ fontWeight: 500, fontSize: '0.875rem' }}>{t('dashboard.overview.provider', { defaultValue: 'Provider' })}</InputLabel>
-                    <Select
-                        value={selectedProvider}
-                        label={t('dashboard.overview.provider', { defaultValue: 'Provider' })}
-                        onChange={(e) => onProviderChange(e.target.value)}
-                        sx={SELECT_SX}
-                    >
-                        <MenuItem value="all">{t('dashboard.overview.allProviders', { defaultValue: 'All providers' })}</MenuItem>
-                        {providerGroups.map((group) => [
-                            <ListSubheader
-                                key={`header-${group.authType}`}
-                                sx={GROUP_SUBHEADER_SX}
-                            >
-                                {group.label}
-                            </ListSubheader>,
-                            ...group.providers.map((p) => (
-                                <MenuItem key={p.uuid} value={p.uuid}>
-                                    {p.name}
+        // The Paper is the size container, so the layout reacts to the toolbar's own
+        // width (sidebar collapsed or not), not the viewport's.
+        <Paper variant="outlined" sx={{ containerType: 'inline-size', px: 1.5, py: 1, borderRadius: 2 }}>
+            <Box
+                sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    columnGap: 1.5,
+                    // Too narrow for one row: range / auto / refresh first, filters below.
+                    [`@container (max-width: ${TOOLBAR_STACK_PX}px)`]: {
+                        flexDirection: 'column',
+                        alignItems: 'stretch',
+                        rowGap: 1.25,
+                    },
+                }}
+            >
+                {/* Filters: one row beside the range controls; when stacked, an even
+                    4-up grid (2x2 when narrower) with the clear button in its own column. */}
+                <Box
+                    sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 1,
+                        minWidth: 0,
+                        // Plenty of room: let the selects show their full labels.
+                        '@container (min-width: 1000px)': {
+                            '& > .MuiFormControl-root': { width: 150 },
+                            '& > .MuiFormControl-root:nth-of-type(4)': { width: 170 },
+                        },
+                        [`@container (max-width: ${TOOLBAR_STACK_PX}px)`]: {
+                            display: 'grid',
+                            gridTemplateColumns: 'repeat(4, minmax(0, 1fr)) auto',
+                            '& > .MuiFormControl-root': { width: '100%' },
+                            '& > .MuiDivider-root': { display: 'none' },
+                        },
+                        [`@container (max-width: ${TOOLBAR_GRID2_PX}px)`]: {
+                            gridTemplateColumns: 'repeat(2, minmax(0, 1fr)) auto',
+                            '& > .MuiIconButton-root': { gridColumn: 3, gridRow: '1 / span 2' },
+                        },
+                    }}
+                >
+                    <FormControl size="small" sx={{ width: { xs: 140, md: 114 } }}>
+                        <InputLabel sx={{ fontWeight: 500, fontSize: '0.875rem' }}>{t('dashboard.overview.agent', { defaultValue: 'Agent' })}</InputLabel>
+                        <Select
+                            value={selectedScenario}
+                            label={t('dashboard.overview.agent', { defaultValue: 'Agent' })}
+                            onChange={(e) => onScenarioChange(e.target.value)}
+                            sx={SELECT_SX}
+                        >
+                            <MenuItem value="all">{t('dashboard.overview.allAgents', { defaultValue: 'All agents' })}</MenuItem>
+                            {agentOptions.map((o) => (
+                                <MenuItem key={o.scenario} value={o.scenario}>
+                                    {scenarioLabel(t, o.scenario)}
                                 </MenuItem>
-                            )),
-                        ])}
-                    </Select>
-                </FormControl>
+                            ))}
+                        </Select>
+                    </FormControl>
 
-                <FormControl size="small" sx={{ width: { xs: 140, md: 124 } }}>
-                    <InputLabel sx={{ fontWeight: 500, fontSize: '0.875rem' }}>{t('dashboard.overview.model', { defaultValue: 'Model' })}</InputLabel>
-                    <Select
-                        value={selectedModel}
-                        label={t('dashboard.overview.model', { defaultValue: 'Model' })}
-                        onChange={(e) => onModelChange(e.target.value)}
-                        sx={SELECT_SX}
-                    >
-                        <MenuItem value="all">{t('dashboard.overview.allModels', { defaultValue: 'All models' })}</MenuItem>
-                        {modelOptions.map((model) => (
-                            <MenuItem key={model} value={model}>
-                                {model}
-                            </MenuItem>
-                        ))}
-                    </Select>
-                </FormControl>
+                    <FormControl size="small" sx={{ width: { xs: 140, md: 124 } }}>
+                        <InputLabel sx={{ fontWeight: 500, fontSize: '0.875rem' }}>{t('dashboard.overview.provider', { defaultValue: 'Provider' })}</InputLabel>
+                        <Select
+                            value={selectedProvider}
+                            label={t('dashboard.overview.provider', { defaultValue: 'Provider' })}
+                            onChange={(e) => onProviderChange(e.target.value)}
+                            sx={SELECT_SX}
+                        >
+                            <MenuItem value="all">{t('dashboard.overview.allProviders', { defaultValue: 'All providers' })}</MenuItem>
+                            {providerGroups.map((group) => [
+                                <ListSubheader
+                                    key={`header-${group.authType}`}
+                                    sx={GROUP_SUBHEADER_SX}
+                                >
+                                    {group.label}
+                                </ListSubheader>,
+                                ...group.providers.map((p) => (
+                                    <MenuItem key={p.uuid} value={p.uuid}>
+                                        {p.name}
+                                    </MenuItem>
+                                )),
+                            ])}
+                        </Select>
+                    </FormControl>
 
-                <FormControl size="small" sx={{ width: { xs: 160, md: 142 } }}>
-                    <InputLabel sx={{ fontWeight: 500, fontSize: '0.875rem' }}>{t('dashboard.overview.identity', { defaultValue: 'Identity' })}</InputLabel>
-                    <Select
-                        value={selectedUser}
-                        label={t('dashboard.overview.identity', { defaultValue: 'Identity' })}
-                        onChange={(e) => onUserChange(e.target.value)}
-                        renderValue={() => selectedIdentityLabel}
-                        sx={SELECT_SX}
-                    >
-                        <MenuItem value="all">{t('dashboard.overview.allIdentities', { defaultValue: 'All identities' })}</MenuItem>
-                        {usageIdentities.filter((identity) => identity.type === 'owner').map((identity) => (
-                            <MenuItem key={identity.userId} value={identity.userId}>
-                                {identity.label}
-                            </MenuItem>
-                        ))}
-                        {sharingKeyGroups.map((group) => [
-                            <ListSubheader key={`keys-${group.team?.id ?? 'other'}`} sx={GROUP_SUBHEADER_SX}>
-                                {group.team
-                                    ? t('dashboard.overview.sharingKeysForTeam', { team: group.team.name })
-                                    : t('dashboard.overview.sharingKeys', { defaultValue: 'Team Keys' })}
-                            </ListSubheader>,
-                            ...group.items.map((identity) => (
+                    <FormControl size="small" sx={{ width: { xs: 140, md: 114 } }}>
+                        <InputLabel sx={{ fontWeight: 500, fontSize: '0.875rem' }}>{t('dashboard.overview.model', { defaultValue: 'Model' })}</InputLabel>
+                        <Select
+                            value={selectedModel}
+                            label={t('dashboard.overview.model', { defaultValue: 'Model' })}
+                            onChange={(e) => onModelChange(e.target.value)}
+                            sx={SELECT_SX}
+                        >
+                            <MenuItem value="all">{t('dashboard.overview.allModels', { defaultValue: 'All models' })}</MenuItem>
+                            {modelOptions.map((model) => (
+                                <MenuItem key={model} value={model}>
+                                    {model}
+                                </MenuItem>
+                            ))}
+                        </Select>
+                    </FormControl>
+
+                    <FormControl size="small" sx={{ width: { xs: 160, md: 130 } }}>
+                        <InputLabel sx={{ fontWeight: 500, fontSize: '0.875rem' }}>{t('dashboard.overview.identity', { defaultValue: 'Identity' })}</InputLabel>
+                        <Select
+                            value={selectedUser}
+                            label={t('dashboard.overview.identity', { defaultValue: 'Identity' })}
+                            onChange={(e) => onUserChange(e.target.value)}
+                            renderValue={() => selectedIdentityLabel}
+                            sx={SELECT_SX}
+                        >
+                            <MenuItem value="all">{t('dashboard.overview.allIdentities', { defaultValue: 'All identities' })}</MenuItem>
+                            {usageIdentities.filter((identity) => identity.type === 'owner').map((identity) => (
                                 <MenuItem key={identity.userId} value={identity.userId}>
-                                    <Box sx={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 2, width: '100%' }}>
-                                        <Typography variant="body2" noWrap>
-                                            {identityLabel(t, identity)}{!identity.enabled ? t('dashboard.overview.disabledSuffix', { defaultValue: ' (disabled)' }) : ''}
-                                        </Typography>
-                                        <Tooltip title={identity.userId} placement="right">
-                                            <Typography
-                                                variant="caption"
-                                                sx={{
-                                                    color: "text.secondary",
-                                                    fontFamily: fontMono,
-                                                    flexShrink: 0
-                                                }}>
-                                                {shortenUserId(identity.userId)}
-                                            </Typography>
-                                        </Tooltip>
-                                    </Box>
+                                    {identity.label}
                                 </MenuItem>
-                            )),
-                        ])}
-                    </Select>
-                </FormControl>
+                            ))}
+                            {sharingKeyGroups.map((group) => [
+                                <ListSubheader key={`keys-${group.team?.id ?? 'other'}`} sx={GROUP_SUBHEADER_SX}>
+                                    {group.team
+                                        ? t('dashboard.overview.sharingKeysForTeam', { team: group.team.name })
+                                        : t('dashboard.overview.sharingKeys', { defaultValue: 'Team Keys' })}
+                                </ListSubheader>,
+                                ...group.items.map((identity) => (
+                                    <MenuItem key={identity.userId} value={identity.userId}>
+                                        <Box sx={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 2, width: '100%' }}>
+                                            <Typography variant="body2" noWrap>
+                                                {identityLabel(t, identity)}{!identity.enabled ? t('dashboard.overview.disabledSuffix', { defaultValue: ' (disabled)' }) : ''}
+                                            </Typography>
+                                            <Tooltip title={identity.userId} placement="right">
+                                                <Typography
+                                                    variant="caption"
+                                                    sx={{
+                                                        color: "text.secondary",
+                                                        fontFamily: fontMono,
+                                                        flexShrink: 0
+                                                    }}>
+                                                    {shortenUserId(identity.userId)}
+                                                </Typography>
+                                            </Tooltip>
+                                        </Box>
+                                    </MenuItem>
+                                )),
+                            ])}
+                        </Select>
+                    </FormControl>
 
-                {hasActiveFilters && (
-                    <>
-                        <Divider orientation="vertical" flexItem sx={{ mx: 0.5, display: { xs: 'none', sm: 'block' } }} />
-                        <Tooltip title={t('dashboard.overview.clearFilters', { defaultValue: 'Clear all filters' })}>
-                            <IconButton
-                                size="small"
-                                onClick={onClearFilters}
-                                sx={{
-                                    backgroundColor: 'action.hover',
-                                    '&:hover': { backgroundColor: 'action.selected' },
-                                }}
-                            >
-                                <FilterOff />
-                            </IconButton>
-                        </Tooltip>
-                    </>
-                )}
-            </Box>
+                    {hasActiveFilters && (
+                        <>
+                            <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
+                            <Tooltip title={t('dashboard.overview.clearFilters', { defaultValue: 'Clear all filters' })}>
+                                <IconButton
+                                    size="small"
+                                    onClick={onClearFilters}
+                                    sx={{
+                                        backgroundColor: 'action.hover',
+                                        '&:hover': { backgroundColor: 'action.selected' },
+                                    }}
+                                >
+                                    <FilterOff />
+                                </IconButton>
+                            </Tooltip>
+                        </>
+                    )}
+                </Box>
 
-            {/* Range + refresh: right-aligned, wraps to its own row on narrow widths. */}
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, ml: 'auto' }}>
-                <FormControl size="small" sx={{ minWidth: 120 }}>
-                    <Select
-                        value={timeRange}
-                        onChange={(e) => onTimeRangeChange(e.target.value as TimeRange)}
-                        inputProps={{ 'aria-label': t('dashboard.overview.timeRange') }}
-                        startAdornment={<TimeIcon fontSize="small" sx={{ mr: 0.75, color: 'text.secondary' }} />}
-                        sx={SELECT_SX}
-                    >
-                        {TIME_RANGES.map((range) => (
-                            <MenuItem key={range} value={range}>{t(TIME_RANGE_CONFIG[range].labelKey)}</MenuItem>
-                        ))}
-                    </Select>
-                </FormControl>
-                <Divider orientation="vertical" flexItem sx={{ mx: 0.5, my: 0.5 }} />
-                <FormControlLabel
-                    control={
-                        <Switch
-                            size="small"
-                            checked={autoRefresh}
-                            onChange={(e) => onAutoRefreshChange(e.target.checked)}
-                            color="primary"
-                        />
-                    }
-                    label={<Typography variant="body2">{t('dashboard.overview.auto', { defaultValue: 'Auto' })}</Typography>}
-                    sx={switchControlLabelStyle}
-                />
-                <Tooltip title={t('dashboard.overview.refreshData', { defaultValue: 'Refresh data' })}>
-                    <IconButton
+                {/* Range + refresh: right-aligned; first row when stacked, with the range stretching. */}
+                <Box
+                    sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 1,
+                        ml: 'auto',
+                        [`@container (max-width: ${TOOLBAR_STACK_PX}px)`]: { ml: 0, order: -1 },
+                    }}
+                >
+                    <FormControl
                         size="small"
-                        onClick={onRefresh}
-                        disabled={refreshing}
                         sx={{
-                            backgroundColor: 'action.hover',
-                            '&:hover': { backgroundColor: 'action.selected' },
-                            '&:disabled': { backgroundColor: 'transparent' },
+                            minWidth: 120,
+                            [`@container (max-width: ${TOOLBAR_STACK_PX}px)`]: { flex: 1 },
                         }}
                     >
-                        {refreshing ? <CircularProgress size={18} /> : <RefreshIcon />}
-                    </IconButton>
-                </Tooltip>
+                        <Select
+                            value={timeRange}
+                            onChange={(e) => onTimeRangeChange(e.target.value as TimeRange)}
+                            inputProps={{ 'aria-label': t('dashboard.overview.timeRange') }}
+                            startAdornment={<TimeIcon fontSize="small" sx={{ mr: 0.75, color: 'text.secondary' }} />}
+                            sx={SELECT_SX}
+                        >
+                            {TIME_RANGES.map((range) => (
+                                <MenuItem key={range} value={range}>{t(TIME_RANGE_CONFIG[range].labelKey)}</MenuItem>
+                            ))}
+                        </Select>
+                    </FormControl>
+                    <Divider orientation="vertical" flexItem sx={{ mx: 0.5, my: 0.5 }} />
+                    <FormControlLabel
+                        control={
+                            <Switch
+                                size="small"
+                                checked={autoRefresh}
+                                onChange={(e) => onAutoRefreshChange(e.target.checked)}
+                                color="primary"
+                            />
+                        }
+                        label={<Typography variant="body2">{t('dashboard.overview.auto', { defaultValue: 'Auto' })}</Typography>}
+                        sx={switchControlLabelStyle}
+                    />
+                    <Tooltip title={t('dashboard.overview.refreshData', { defaultValue: 'Refresh data' })}>
+                        <IconButton
+                            size="small"
+                            onClick={onRefresh}
+                            disabled={refreshing}
+                            sx={{
+                                backgroundColor: 'action.hover',
+                                '&:hover': { backgroundColor: 'action.selected' },
+                                '&:disabled': { backgroundColor: 'transparent' },
+                            }}
+                        >
+                            {refreshing ? <CircularProgress size={18} /> : <RefreshIcon />}
+                        </IconButton>
+                    </Tooltip>
+                </Box>
             </Box>
         </Paper>
     );
