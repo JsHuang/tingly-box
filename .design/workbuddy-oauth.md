@@ -111,11 +111,47 @@ something to settle in code review.
 | **C** | Drive the **official** CodeBuddy CLI / Agent SDK as the client (user logs in with Tencent's own tool; Tingly-Box orchestrates, like `@cc`) | Lowest: Tencent's own binary and login | Medium (needs CLI installed) | Medium, but does not give a generic OpenAI endpoint |
 | **D** | Don't integrate; document "use WorkBuddy's custom model" in the other direction (WorkBuddy accepts OpenAI-compatible models, so it can point at Tingly-Box) | None | n/a | Doc only |
 
+| **E** | **Official CodeBuddy OAuth2 open platform** (§5.1): register an app, Authorization Code (user login) or Client Credentials (enterprise/CI) | **Sanctioned** — documented by Tencent | Good if the token can reach chat | Small–medium; standard OAuth, fits existing `OAuthMethodAuthorizationCode` |
+
 Note D is already possible: WorkBuddy's custom-model dialog accepts any
 OpenAI-compatible endpoint, so Tingly-Box can be WorkBuddy's *upstream* today.
 
+### 5.1 Option E — official OAuth2 (found after the first pass)
+
+Tencent documents a real OAuth 2.0 / OIDC surface on `copilot.tencent.com`
+(IAM docs: workbuddy.ai/docs/cli/iam; example app: cnb.cool/CNBshow/openapp_example,
+a fork of `codebuddy/openapp_example`):
+
+| | |
+|---|---|
+| Authorize | `https://copilot.tencent.com/oauth2/authorize` (`client_id`, `redirect_uri`, `state`, `scope=openid`, `response_mode=query`) |
+| Token | `https://copilot.tencent.com/oauth2/token` — `authorization_code` (`client_id`, `client_secret`, `code`, `redirect_uri`) or `client_credentials` |
+| Userinfo | `https://copilot.tencent.com/oauth2/userinfo` |
+| Registration | enterprise app via `copilot.tencent.com/apiDocs/open-platform.html` → Client ID/Secret |
+| Prereq | enterprise users must buy **CodeBuddy Premium** first |
+| CLI use | token via `CODEBUDDY_AUTH_TOKEN` or `apiKeyHelper` (priority: AUTH_TOKEN > apiKeyHelper > API_KEY) |
+
+Unknowns that decide whether E replaces A:
+
+- The docs only show the token being consumed by CodeBuddy's own CLI/SDK and
+  `userinfo`; they **do not say the token can call `/v2/chat/completions`**
+  from a third-party gateway. Verify with a real app.
+- Client Credentials is enterprise/server-side; the personal-user Authorization
+  Code path may require an approved app, and how a project like Tingly-Box
+  registers one (per-user app vs. a shared client) is unanswered.
+- Token lifetime and refresh semantics are not documented.
+- The docs also describe `CODEBUDDY_BASE_URL` for pointing the CLI at a third-party
+  gateway — i.e. CodeBuddy-as-client → Tingly-Box, which is Option D from the
+  CLI side and is explicitly supported.
+
+If E's token works against the chat endpoint, it is the compliant path and
+supersedes A; implementation is a standard `OAuthMethodAuthorizationCode`
+provider (callback server already exists) rather than a ZCode-style poller.
+
 ## 6. Recommendation
 
+0. **Verify Option E first** (§5.1): register a test app and check whether its
+   token can call chat. This may make A unnecessary.
 1. **Do not implement Option A now.** Open a request to Tencent (or confirm
    whether an official third-party program exists) and decide at the §4 gate.
 2. Ship **D** immediately as documentation (a "use Tingly-Box from WorkBuddy"
