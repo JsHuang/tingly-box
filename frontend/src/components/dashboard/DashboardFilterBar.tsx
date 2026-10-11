@@ -175,7 +175,10 @@ export default function DashboardFilterBar({
                             '& > .MuiDivider-root': { display: 'none' },
                         },
                         [`@container (max-width: ${TOOLBAR_GRID2_PX}px)`]: {
-                            gridTemplateColumns: 'repeat(2, minmax(0, 1fr)) auto',
+                            // The extra column exists only while the clear button does; otherwise
+                            // the third filter would flow into it and the grid would read 3 + 1.
+                            gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+                            '&:has(> .MuiIconButton-root)': { gridTemplateColumns: 'repeat(2, minmax(0, 1fr)) auto' },
                             '& > .MuiIconButton-root': { gridColumn: 3, gridRow: '1 / span 2' },
                         },
                     }}
