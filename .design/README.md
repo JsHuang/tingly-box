@@ -51,6 +51,7 @@
 | [stream-converter-pipeline.md](./stream-converter-pipeline.md) | Stream Converter Pipeline | 设计说明；局部实施状态见正文 |
 | [multimodal-content.md](./multimodal-content.md) | Multimodal content — protocol catalog & conversion contract | 设计说明；局部实施状态见正文 |
 | [anthropic-sdk-stream-tool-name-restoration.md](./anthropic-sdk-stream-tool-name-restoration.md) | Restoring tool names in Anthropic streaming responses | 设计说明；局部实施状态见正文 |
+| [sdk-slim.md](./sdk-slim.md) | 把 fork 的 openai/anthropic/genai SDK 按真实用法裁剪（声明级可达性分析），含 genai 去 cloud auth 依赖的 patch | 原型，可复现（`scripts/sdk-slim/`）；分发（独立 module）未做 |
 | [openai-endpoint-routing.md](./openai-endpoint-routing.md) | OpenAI Endpoint Routing 设计 | 设计说明；局部实施状态见正文 |
 | [tier-routing.md](./tier-routing.md) | Tier-Based Service Routing | 设计说明；局部实施状态见正文 |
 | [rule-flags.md](./rule-flags.md) | Rule Flags 设计与实操 | 设计说明；局部实施状态见正文 |

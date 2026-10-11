@@ -1,0 +1,188 @@
+--- a/client.go
++++ b/client.go
+@@ -21,10 +21,6 @@
+ 	"net/http"
+ 	"os"
+ 	"strings"
+-
+-	"cloud.google.com/go/auth"
+-	"cloud.google.com/go/auth/credentials"
+-	"cloud.google.com/go/auth/httptransport"
+ )
+ 
+ // Client is the GenAI client. It provides access to the various GenAI services.
+@@ -87,6 +83,17 @@
+ 	"eu": true,
+ }
+ 
++// Credentials is the minimal credential surface the client needs. It is satisfied
++// by *auth.Credentials from cloud.google.com/go/auth, so callers that build their
++// own credentials keep compiling, but this package no longer imports that module.
++//
++// tingly patch (genai-no-auth): built-in Application Default Credentials discovery
++// and the Live API / RegisterFiles token paths were removed; callers supply an
++// authenticated HTTPClient for Vertex AI.
++type Credentials interface {
++	QuotaProjectID(ctx context.Context) (string, error)
++}
++
+ // ClientConfig is the configuration for the GenAI client.
+ type ClientConfig struct {
+ 	// Optional. API Key for GenAI. Required for BackendGeminiAPI.
+@@ -111,7 +118,7 @@
+ 	// Optional. Google credentials.  If not specified, [Application Default Credentials] will be used.
+ 	//
+ 	// [Application Default Credentials]: https://developers.google.com/accounts/docs/application-default-credentials
+-	Credentials *auth.Credentials
++	Credentials Credentials
+ 
+ 	// Optional HTTP client to use. If nil, a default client will be created.
+ 	// For Vertex AI, this client must handle authentication appropriately.
+@@ -344,17 +351,6 @@
+ 		}
+ 	}
+ 
+-	skipADC := cc.HTTPOptions.BaseURL != "" && cc.Project == "" && cc.Location == "" && cc.APIKey == ""
+-	if cc.Backend == BackendVertexAI && cc.Credentials == nil && cc.APIKey == "" && cc.HTTPClient == nil && !skipADC {
+-		cred, err := credentials.DetectDefault(&credentials.DetectOptions{
+-			Scopes: []string{"https://www.googleapis.com/auth/cloud-platform"},
+-		})
+-		if err != nil {
+-			return nil, fmt.Errorf("failed to find default credentials: %w", err)
+-		}
+-		cc.Credentials = cred
+-	}
+-
+ 	if cc.HTTPOptions.APIVersion == "" && cc.Backend == BackendVertexAI {
+ 		cc.HTTPOptions.APIVersion = "v1beta1"
+ 	} else if cc.HTTPOptions.APIVersion == "" {
+@@ -362,25 +358,10 @@
+ 	}
+ 
+ 	if cc.HTTPClient == nil {
+-		// x-goog-api-key header is set for Express mode in api_client.go
+-		if cc.Backend == BackendVertexAI && cc.APIKey == "" && cc.Credentials != nil {
+-			quotaProjectID, err := cc.Credentials.QuotaProjectID(ctx)
+-			if err != nil {
+-				return nil, fmt.Errorf("failed to get quota project ID: %w", err)
+-			}
+-			client, err := httptransport.NewClient(&httptransport.Options{
+-				Credentials: cc.Credentials,
+-				Headers: http.Header{
+-					"X-Goog-User-Project": []string{quotaProjectID},
+-				},
+-			})
+-			if err != nil {
+-				return nil, fmt.Errorf("failed to create HTTP client: %w", err)
+-			}
+-			cc.HTTPClient = client
+-		} else {
+-			cc.HTTPClient = &http.Client{}
++		if cc.Backend == BackendVertexAI && cc.APIKey == "" {
++			return nil, fmt.Errorf("an authenticated HTTPClient is required for the Vertex AI backend without an API key")
+ 		}
++		cc.HTTPClient = &http.Client{}
+ 	}
+ 	return &apiClient{clientConfig: cc}, nil
+ }
+@@ -441,31 +422,3 @@
+ func (c Client) ClientConfig() ClientConfig {
+ 	return c.clientConfig
+ }
+-
+-// UseDefaultCredentials sets the credentials to use default credentials and
+-// add authorization middleware to the HTTP client.
+-//
+-// If the ClientConfig already has credentials, this method will return an error.
+-//
+-// Use this method if your provided HTTPClient doesn't handles credentials.
+-func (cc *ClientConfig) UseDefaultCredentials() error {
+-	if cc.Credentials != nil {
+-		return fmt.Errorf("Credentials are already set")
+-	}
+-	if cc.Credentials == nil {
+-		cred, err := credentials.DetectDefault(&credentials.DetectOptions{
+-			Scopes: []string{"https://www.googleapis.com/auth/cloud-platform"},
+-		})
+-		if err != nil {
+-			return fmt.Errorf("failed to find default credentials: %w", err)
+-		}
+-		cc.Credentials = cred
+-	}
+-	if cc.HTTPClient != nil {
+-		err := httptransport.AddAuthorizationMiddleware(cc.HTTPClient, cc.Credentials)
+-		if err != nil {
+-			return fmt.Errorf("failed to create HTTP client: %w", err)
+-		}
+-	}
+-	return nil
+-}
+--- a/live.go
++++ b/live.go
+@@ -76,13 +76,6 @@
+ 	var header http.Header = mergeHeaders(&httpOptions, nil)
+ 	if r.apiClient.clientConfig.Backend == BackendVertexAI {
+ 		hasStandardAuth := r.apiClient.clientConfig.Project != "" && r.apiClient.clientConfig.Location != ""
+-		if r.apiClient.clientConfig.Credentials != nil {
+-			token, err := r.apiClient.clientConfig.Credentials.Token(context)
+-			if err != nil {
+-				return nil, fmt.Errorf("failed to get token: %w", err)
+-			}
+-			header.Set("Authorization", fmt.Sprintf("Bearer %s", token.Value))
+-		}
+ 
+ 		wsPath := path.Join(baseURL.Path, fmt.Sprintf("ws/google.cloud.aiplatform.%s.LlmBidiService/BidiGenerateContent", httpOptions.APIVersion))
+ 		// If custom base URL is used but no standard auth exists, assume proxy uses its own path.
+--- a/files.go
++++ b/files.go
+@@ -17,7 +17,6 @@
+ package genai
+ 
+ import (
+-	"cloud.google.com/go/auth"
+ 	"context"
+ 	"fmt"
+ 	"io"
+@@ -698,42 +697,3 @@
+ 
+ 	return m.Upload(ctx, osf, &copiedCfg)
+ }
+-
+-// RegisterFiles registers Google Cloud Storage files for use with the API.
+-//
+-// This method is only supported in the Gemini Developer client.
+-func (m Files) RegisterFiles(ctx context.Context, uris []string, creds *auth.Credentials, config *RegisterFilesConfig) (*RegisterFilesResponse, error) {
+-	if m.apiClient.clientConfig.Backend == BackendVertexAI {
+-		return nil, fmt.Errorf("method RegisterFiles is only supported in Gemini Developer API mode, not in Gemini Enterprise Agent Platform mode. You can choose to use Gemini Developer client by setting ClientConfig.Backend to BackendGeminiAPI.")
+-	}
+-
+-	if creds == nil {
+-		return nil, fmt.Errorf("credentials are required for RegisterFiles")
+-	}
+-
+-	token, err := creds.Token(ctx)
+-	if err != nil {
+-		return nil, fmt.Errorf("failed to get token from credentials: %w", err)
+-	}
+-
+-	var localConfig RegisterFilesConfig
+-	if config != nil {
+-		localConfig = *config
+-	}
+-
+-	httpOptions := mergeHTTPOptions(m.apiClient.clientConfig, localConfig.HTTPOptions)
+-
+-	if httpOptions.Headers == nil {
+-		httpOptions.Headers = http.Header{}
+-	}
+-	httpOptions.Headers.Set("Authorization", "Bearer "+token.Value)
+-
+-	quotaProjectID, _ := creds.QuotaProjectID(ctx)
+-	if quotaProjectID != "" {
+-		httpOptions.Headers.Set("X-Goog-User-Project", quotaProjectID)
+-	}
+-
+-	localConfig.HTTPOptions = httpOptions
+-
+-	return m.registerFiles(ctx, uris, &localConfig)
+-}
