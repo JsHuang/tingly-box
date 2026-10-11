@@ -489,9 +489,10 @@ export const ModelRequestHeader: React.FC<ModelRequestHeaderProps> = ({
                         variant="caption"
                         title={typeof subtitle === 'string' ? subtitle : undefined}
                         sx={{
-                            color: 'text.secondary', ml: 1, flex: '1 1 0', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                            // Its text length must not count toward the header's width, or a long
-                            // description would push the actions onto a second row.
+                            color: 'text.secondary', ml: 1, flex: '1 1 120px', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                            // Less than ~120px left beside the controls: the description drops
+                            // to its own line (full width) instead of showing as "R…".
+                            // Its text length itself never counts toward the width.
                             contain: 'inline-size',
                         }}
                     >
