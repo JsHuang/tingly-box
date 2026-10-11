@@ -67,8 +67,10 @@ const HeaderContainer = styled(Box, {
     shouldForwardProp: (prop) => prop !== 'collapsible',
 })<{ collapsible?: boolean }>(({ collapsible, theme }) => ({
     display: 'flex',
-    flexWrap: 'wrap' as const,
-    alignItems: 'center',
+    // The actions stay at the right of the first row; at narrow widths it is
+    // the title section that wraps (its controls drop to a second row).
+    flexWrap: 'nowrap' as const,
+    alignItems: 'flex-start',
     justifyContent: 'space-between',
     padding: `${HEADER_PADDING_Y}px ${HEADER_PADDING_X}px`,
     gap: 4,
@@ -80,13 +82,17 @@ const HeaderContainer = styled(Box, {
     }),
 }));
 
+// Name + controls, then the description. One line: the description is what
+// gives way (it ellipsizes), so every rule card's header lines up and the
+// actions stay on the same row as the name instead of dropping under it.
 const TitleSection = styled(Box)(({ theme }) => ({
     display: 'flex',
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'flex-start',
     gap: theme.spacing(0.5),
-    flexGrow: 0,
+    flex: '1 1 0',
     minWidth: 0,
+    // Only the controls ever wrap (below); the description just shortens.
     flexWrap: 'wrap' as const,
 }));
 
@@ -95,8 +101,9 @@ const ActionsSection = styled(Box)(({ theme }) => ({
     alignItems: 'center',
     gap: theme.spacing(0.25),
     flexShrink: 0,
-    // When the header wraps (narrow window), the actions stay at the right edge.
+    // Stay at the right edge, level with the first row of the title.
     marginLeft: 'auto',
+    minHeight: 28,
 }));
 
 const ModelNameText = styled(Typography)(({ theme }) => ({
@@ -242,7 +249,7 @@ export const ModelRequestHeader: React.FC<ModelRequestHeaderProps> = ({
         }
 
         return (
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, minWidth: 0 }} onClick={(e) => e.stopPropagation()}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, minWidth: 0, flexWrap: 'wrap', rowGap: 0.5 }} onClick={(e) => e.stopPropagation()}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, width: NAME_SLOT_WIDTH, flexShrink: 0 }}>
                     <Tooltip
                         title={modelName ? `${modelName} (click to copy)` : 'No model specified'}
@@ -478,7 +485,16 @@ export const ModelRequestHeader: React.FC<ModelRequestHeaderProps> = ({
             <TitleSection>
                 {renderTitle()}
                 {subtitle && !editMode && (
-                    <Typography variant="caption" sx={{ color: 'text.secondary', ml: 1 }}>
+                    <Typography
+                        variant="caption"
+                        title={typeof subtitle === 'string' ? subtitle : undefined}
+                        sx={{
+                            color: 'text.secondary', ml: 1, flex: '1 1 0', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                            // Its text length must not count toward the header's width, or a long
+                            // description would push the actions onto a second row.
+                            contain: 'inline-size',
+                        }}
+                    >
                         {subtitle}
                     </Typography>
                 )}
