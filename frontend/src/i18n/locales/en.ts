@@ -489,6 +489,9 @@ export default {
   },
   "templateActions": {
     "troubleshoot": "Troubleshoot",
+    "more": "More",
+    "sortMenuToName": "Sort by name (A→Z)",
+    "sortMenuToOriginal": "Sort by original order",
     "collapseAllRules": "Collapse all rules",
     "expandAllRules": "Expand all rules",
     "connectAI": "Connect AI",

@@ -490,6 +490,9 @@ export default {
   },
   "templateActions": {
     "troubleshoot": "Диагностика",
+    "more": "Ещё",
+    "sortMenuToName": "Сортировать по имени (А→Я)",
+    "sortMenuToOriginal": "Исходный порядок правил",
     "collapseAllRules": "Свернуть все правила",
     "expandAllRules": "Развернуть все правила",
     "connectAI": "Подключить ИИ",

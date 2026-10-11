@@ -487,6 +487,9 @@ export default {
   },
   "templateActions": {
     "troubleshoot": "错误检查",
+    "more": "更多",
+    "sortMenuToName": "按名称排序（A→Z）",
+    "sortMenuToOriginal": "按原始顺序排序",
     "collapseAllRules": "收起所有规则",
     "expandAllRules": "展开所有规则",
     "connectAI": "连接 AI",
