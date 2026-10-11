@@ -70,6 +70,7 @@ const TemplatePage: React.FC<TemplatePageProps> = (props) => {
         rightAction: customRightAction,
         onAddApiKeyClick,
         onContext1MToggle,
+        hideTroubleshoot = false,
     } = props;
 
     // Use provided props or fallback to internal data
@@ -320,7 +321,7 @@ const TemplatePage: React.FC<TemplatePageProps> = (props) => {
             allowAddRule={allowAddRule}
             onCreateRule={handleCreateRule}
             showExpandCollapseButton={showExpandCollapseButton}
-            onViewLogs={scenario ? () => setLogDialogOpen(true) : undefined}
+            onViewLogs={scenario && !hideTroubleshoot ? () => setLogDialogOpen(true) : undefined}
             onProbeAll={rules.length > 0 ? handleProbeAll : undefined}
             onShowGuide={() => setShowGuide(true)}
             sortMode={rules.length > 1 ? sortMode : undefined}

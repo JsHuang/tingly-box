@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Box, Button, CircularProgress, Fade, IconButton, Tooltip, Typography } from '@mui/material';
+import { Box, CircularProgress, Fade, IconButton, Tooltip, Typography } from '@mui/material';
 import { alpha, useTheme } from '@mui/material/styles';
 import { useTranslation } from 'react-i18next';
 import {
@@ -128,17 +128,17 @@ export const QuickProbeButton: React.FC<QuickProbeButtonProps> = ({ ruleUuid, ru
 
             <Tooltip title={t('probe.quickTest')}>
                 <span>
-                    <Button
+                    {/* Icon only, the same size as the "⋯" and fold icons beside it;
+                        the label is the tooltip and the aria-label. */}
+                    <IconButton
                         size="small"
-                        variant="outlined"
-                        color="inherit"
                         onClick={run}
                         disabled={running}
-                        startIcon={running ? <CircularProgress size={14} thickness={5} /> : <BoltIcon sx={{ fontSize: 16 }} />}
-                        sx={{ height: 26, px: 1, textTransform: 'none', fontSize: fontSizes.sm, fontWeight: 600, borderColor: 'divider', whiteSpace: 'nowrap' }}
+                        aria-label={t('ruleHeader.test')}
+                        sx={{ color: 'text.secondary', '&:hover': { backgroundColor: 'action.hover' } }}
                     >
-                        {t('ruleHeader.test')}
-                    </Button>
+                        {running ? <CircularProgress size={16} thickness={5} /> : <BoltIcon fontSize="small" />}
+                    </IconButton>
                 </span>
             </Tooltip>
 

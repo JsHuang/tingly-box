@@ -9,6 +9,7 @@ const base = {
     onApplyConfig: vi.fn(),
     onOpenRequests: vi.fn(),
     onOpenUsage: vi.fn(),
+    onOpenLog: vi.fn(),
 };
 
 describe('AgentStatusRow', () => {
@@ -45,6 +46,13 @@ describe('AgentStatusRow', () => {
         );
         fireEvent.click(screen.getByRole('button', { name: 'clientConfigStatus.reapply' }));
         expect(onApplyConfig).toHaveBeenCalledOnce();
+    });
+
+    it('opens the log', () => {
+        const onOpenLog = vi.fn();
+        render(<AgentStatusRow {...base} onOpenLog={onOpenLog} observation={null} />);
+        fireEvent.click(screen.getByRole('button', { name: 'agentStatus.log' }));
+        expect(onOpenLog).toHaveBeenCalledOnce();
     });
 
     it('opens requests and usage', () => {

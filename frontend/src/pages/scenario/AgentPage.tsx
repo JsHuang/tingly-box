@@ -10,6 +10,7 @@ import PageHeader from '@/components/PageHeader';
 import ConnectAIDialogs from '@/components/ConnectAIDialogs';
 import PageLayout from '@/components/PageLayout';
 import ProviderConfigCard from '@/components/ProviderConfigCard.tsx';
+import ScenarioLogDialog from '@/components/RuleLogDialog';
 import PluginFeatures from '@/components/PluginFeatures';
 import type { EnvironmentMode } from '@/components/EnvironmentModeSwitcher';
 import { transformUrlByMode } from '@/utils/tokenUtils';
@@ -167,6 +168,7 @@ const AgentPageContent: React.FC<{ agent: AgentPageDescriptor }> = ({ agent }) =
     // Requests (a dialog) and Usage (the Dashboard, filtered to this agent) are looks-in
     // from the status row.
     const [requestsOpen, setRequestsOpen] = useState(false);
+    const [logOpen, setLogOpen] = useState(false);
     const navigate = useNavigate();
     const observation = useAgentObservation(scenario);
     // A finished Quick Start leaves the page; its button in the status row brings it back
@@ -302,6 +304,7 @@ const AgentPageContent: React.FC<{ agent: AgentPageDescriptor }> = ({ agent }) =
                     configStatus={clientConfigStatus}
                     onApplyConfig={openDialog}
                     onOpenRequests={() => setRequestsOpen(true)}
+                    onOpenLog={() => setLogOpen(true)}
                     // The Dashboard already opens filtered to one agent (?scenario=).
                     onOpenUsage={() => navigate(`/dashboard/today?scenario=${encodeURIComponent(scenario)}`)}
                 />
@@ -400,9 +403,11 @@ const AgentPageContent: React.FC<{ agent: AgentPageDescriptor }> = ({ agent }) =
                         })}
                     {...(agent.rulesTitleKey ? { title: t(agent.rulesTitleKey) } : {})}
                     collapsible={true}
+                    hideTroubleshoot
                     {...(agent.context1M ? { onContext1MToggle: context1M.handleContext1MToggle } : {})}
                 />
 
+                <ScenarioLogDialog open={logOpen} onClose={() => setLogOpen(false)} scenario={scenario} title={t('agentStatus.log')} />
                 <AgentActivityDialog scenario={scenario} view="requests" open={requestsOpen} onClose={() => setRequestsOpen(false)} />
                 {slotRouting && slots.modeDialog}
                 {setup.kind !== 'none' && setup.renderDialog(slot)}

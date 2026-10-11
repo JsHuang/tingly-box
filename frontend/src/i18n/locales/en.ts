@@ -2209,6 +2209,8 @@ export default {
     "stale_other": "Config out of date · {{count}} differences",
     "requests": "Requests",
     "usage": "Usage",
+    "log": "Log",
+    "logTooltip": "Open this agent's logs (AI requests and system log)",
     "usageTooltip": "Open the Dashboard filtered to this agent"
   },
   "agentAccess": {

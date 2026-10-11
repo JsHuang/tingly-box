@@ -40,6 +40,7 @@ export interface AgentStatusRowProps {
     onApplyConfig: () => void;
     onOpenRequests: () => void;
     onOpenUsage: () => void;
+    onOpenLog: () => void;
 }
 
 const Dot: React.FC<{ color: string }> = ({ color }) => (
@@ -53,6 +54,7 @@ export const AgentStatusRow: React.FC<AgentStatusRowProps> = ({
     onApplyConfig,
     onOpenRequests,
     onOpenUsage,
+    onOpenLog,
 }) => {
     const { t, i18n } = useTranslation();
     const hasRequests = !!observation?.lastRequestAt;
@@ -135,6 +137,11 @@ export const AgentStatusRow: React.FC<AgentStatusRowProps> = ({
                 <Tooltip title={t('agentStatus.usageTooltip')} describeChild>
                     <Button variant="outlined" size="small" onClick={onOpenUsage}>
                         {t('agentStatus.usage')}
+                    </Button>
+                </Tooltip>
+                <Tooltip title={t('agentStatus.logTooltip')} describeChild>
+                    <Button variant="outlined" size="small" onClick={onOpenLog}>
+                        {t('agentStatus.log')}
                     </Button>
                 </Tooltip>
             </Box>
