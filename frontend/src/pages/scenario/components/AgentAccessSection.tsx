@@ -6,6 +6,11 @@ import { fontMono } from '@/theme/fonts';
 import ConfigRow from '@/components/ConfigRow';
 import { SCENARIO_HEADER_CONTENT_MAX_WIDTH } from './ScenarioCardHeader';
 
+// Room kept at the card's right edge for the fold chevron, in both states, so
+// the row's own actions (Local | Docker, copy) never run underneath it at narrow
+// widths and the first row sits in the same place whether folded or open.
+const CHEVRON_GUTTER = 6;
+
 const PREF_KEY = (scenario: string) => `agent-access-expanded-${scenario}`;
 
 const readPref = (scenario: string): boolean | null => {
@@ -103,7 +108,7 @@ export const AgentAccessSection: React.FC<AgentAccessSectionProps> = ({ expanded
                     aria-label={label}
                     sx={{ display: 'block', width: '100%', textAlign: 'left', '&:hover': { backgroundColor: 'action.hover' } }}
                 >
-                    <Box sx={{ pt: 1, pb: 1 }}>
+                    <Box sx={{ pt: 1, pb: 1, pr: CHEVRON_GUTTER }}>
                         <Box sx={{ maxWidth: SCENARIO_HEADER_CONTENT_MAX_WIDTH }}>
                             <Box sx={{ px: 2, py: 0.5 }}>
                                 <ConfigRow
@@ -129,7 +134,7 @@ export const AgentAccessSection: React.FC<AgentAccessSectionProps> = ({ expanded
                 </ButtonBase>
             )}
             <Collapse in={expanded} timeout={0} unmountOnExit>
-                <Box sx={{ pt: 1, pb: 1 }}>{children}</Box>
+                <Box sx={{ pt: 1, pb: 1, pr: CHEVRON_GUTTER }}>{children}</Box>
             </Collapse>
         </Card>
     );
