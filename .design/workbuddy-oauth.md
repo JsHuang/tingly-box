@@ -208,8 +208,8 @@ OAuth. Same shape as Pi/Xcode: a scenario + a guide page.
   (`/tingly/:scenario[/v1]/...`), so nothing else is needed.
 - **Frontend:** `UseWorkBuddyPage` (`AgentPage` descriptor, guide-type setup),
   `WorkBuddyConfigModal`, nav entry, `/agent/workbuddy` route, `workbuddy`
-  i18n (en/zh/ru), icon (`WorkBuddy` reuses the Tencent mark — no dedicated
-  mark exists in lobehub), guardrail scope label, mock rule.
+  i18n (en/zh/ru), icon (`assets/icons/workbuddy.svg`, the official logo from
+  workbuddy.ai, full colour), guardrail scope label, mock rule.
 - **User-facing steps:** WorkBuddy → Settings → Model → Add model → Custom;
   URL = `{base}/tingly/workbuddy/v1/chat/completions` (WorkBuddy requires the
   *full* path and does not append one), API key = Tingly-Box token, Model ID = a

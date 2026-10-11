@@ -55,6 +55,7 @@ import SlackSvg from '@/assets/icons/slack.svg?url';
 import TelegramSvg from '@/assets/icons/telegram.svg?url';
 import WeComSvg from '@/assets/icons/wecom.svg?url';
 import WeixinSvg from '@/assets/icons/weixin.svg?url';
+import WorkBuddySvg from '@/assets/icons/workbuddy.svg?url';
 import XcodeSvg from '@/assets/icons/xcode.svg?url';
 import VSCodeSvg from '@/assets/icons/vscode.svg?url';
 
@@ -135,9 +136,8 @@ export const Xcode = createBrandIcon(XcodeSvg, 'Xcode', true);
 export const VSCode = createBrandIcon(VSCodeSvg, 'VS Code', true);
 export const Cursor = createBrandIcon(CursorSvg, 'Cursor', false, true);
 export const Pi = createBrandIcon(PiSvg, 'Pi', false, true);
-// WorkBuddy is Tencent's agent; no dedicated mark ships in lobehub, so it
-// borrows the Tencent one (TencentSvg is imported further up).
-export const WorkBuddy = createBrandIcon(TencentSvg, 'WorkBuddy', false, true);
+// Official WorkBuddy logo (workbuddy.ai). Full colour, so no dark-mode inversion.
+export const WorkBuddy = createBrandIcon(WorkBuddySvg, 'WorkBuddy');
 
 // Tingly-Box's own mark (full colour, so no dark-mode inversion). Marks a
 // provider that is itself another Tingly-Box gateway.
