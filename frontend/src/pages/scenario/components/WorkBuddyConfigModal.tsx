@@ -101,7 +101,7 @@ const WorkBuddyConfigModal: React.FC<WorkBuddyConfigModalProps> = ({
                             borderColor: 'divider',
                             bgcolor: 'background.paper',
                             fontFamily: fontMono,
-                            fontSize: 12,
+                            fontSize: 11.5,
                             overflowX: 'auto',
                         }}
                     >
