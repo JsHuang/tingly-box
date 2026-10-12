@@ -1,4 +1,4 @@
-import { Dialog, DialogActions, DialogContent, DialogTitle, Button, Typography, Stack } from '@mui/material';
+import { Box, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, Button, Divider, Typography, Stack } from '@mui/material';
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { useScenarioPageModal } from '@/pages/scenario/context/ScenarioPageContext';
@@ -11,6 +11,11 @@ interface WorkBuddyConfigModalProps {
     onClose: () => void;
     baseUrl: string;
     copyToClipboard: (text: string, label: string) => Promise<void>;
+    /** models.json entries Auto Config would write, API key masked. */
+    previewJson: string;
+    isPreviewLoading: boolean;
+    onApply: () => Promise<void>;
+    isApplyLoading: boolean;
 }
 
 const WorkBuddyConfigModal: React.FC<WorkBuddyConfigModalProps> = ({
@@ -18,6 +23,10 @@ const WorkBuddyConfigModal: React.FC<WorkBuddyConfigModalProps> = ({
     onClose,
     baseUrl,
     copyToClipboard,
+    previewJson,
+    isPreviewLoading,
+    onApply,
+    isApplyLoading,
 }) => {
     const { t } = useTranslation();
     const { token } = useScenarioPageModal();
@@ -26,6 +35,7 @@ const WorkBuddyConfigModal: React.FC<WorkBuddyConfigModalProps> = ({
     // either way.
     const url = `${baseUrl}/tingly/workbuddy/v1/chat/completions`;
     const modelPlaceholder = t('scenarioPage.workbuddy.modelPlaceholder');
+
     return (
         <Dialog
             open={open}
@@ -41,6 +51,35 @@ const WorkBuddyConfigModal: React.FC<WorkBuddyConfigModalProps> = ({
             </DialogTitle>
             <DialogContent sx={{ pt: 1 }}>
                 <Stack spacing={2}>
+                    <Typography variant="subtitle2">{t('scenarioPage.workbuddy.autoTitle')}</Typography>
+                    <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                        {t('scenarioPage.workbuddy.autoDescription')}
+                    </Typography>
+                    <Box
+                        component="pre"
+                        sx={{
+                            m: 0,
+                            p: 1.5,
+                            borderRadius: 1,
+                            border: 1,
+                            borderColor: 'divider',
+                            bgcolor: 'background.paper',
+                            fontFamily: fontMono,
+                            fontSize: 11.5,
+                            overflowX: 'auto',
+                            maxHeight: 240,
+                            overflowY: 'auto',
+                        }}
+                    >
+                        {isPreviewLoading ? t('scenarioPage.workbuddy.previewLoading') : previewJson}
+                    </Box>
+                    <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                        {t('scenarioPage.workbuddy.autoCaveat')}
+                    </Typography>
+
+                    <Divider />
+
+                    <Typography variant="subtitle2">{t('scenarioPage.workbuddy.manualTitle')}</Typography>
                     <InstructionSteps
                         steps={[
                             <><strong>1.</strong> {t('scenarioPage.workbuddy.step1')}</>,
@@ -69,9 +108,17 @@ const WorkBuddyConfigModal: React.FC<WorkBuddyConfigModalProps> = ({
                     </Typography>
                 </Stack>
             </DialogContent>
-            <DialogActions sx={{ px: 3, pb: 2, pt: 1 }}>
-                <Button onClick={onClose} variant="contained">
+            <DialogActions sx={{ px: 3, pb: 2, pt: 1, gap: 1 }}>
+                <Button onClick={onClose} color="inherit">
                     {t('common.done')}
+                </Button>
+                <Button
+                    onClick={onApply}
+                    variant="contained"
+                    disabled={isApplyLoading}
+                    startIcon={isApplyLoading ? <CircularProgress size={16} color="inherit" /> : null}
+                >
+                    {isApplyLoading ? t('common.applying') : t('scenarioPage.autoConfig')}
                 </Button>
             </DialogActions>
         </Dialog>

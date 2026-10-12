@@ -242,12 +242,29 @@ OAuth. Same shape as Pi/Xcode: a scenario + a guide page.
   - **No release note or doc announcing a move/rename of the file was found.**
     The two directories most likely differ by product (CodeBuddy vs the WorkBuddy
     desktop app) rather than by version, but that is inference, not confirmation.
-  - Therefore no file snippet and no auto-config in the guide. If we add it, the
-    only officially documented target is `~/.codebuddy/models.json`; a safe
-    implementation must merge (touch only an entry we own, keep the user's other
-    models), write atomically, never create the file blind for the desktop app, and
-    show a status chip. Needs a real WorkBuddy install to confirm which file the
-    desktop app reads.
+  - **Decision (2026-10-12): Auto Config writes `~/.codebuddy/models.json`** — the
+    only officially documented target — and keeps the UI steps as the manual
+    fallback (they work whichever file the desktop app reads). It does **not** write
+    `~/.workbuddy/models.json` (third-party only). Risk accepted: if the desktop
+    app reads a different file, Auto Config is a silent no-op; the dialog says so
+    and points at the manual steps.
+- **Auto Config behaviour** (`internal/config/apply_config_workbuddy.go`,
+  `configapply/handler_workbuddy.go`; routes `GET /config/workbuddy/status`,
+  `GET /config/preview/workbuddy`, `POST /config/apply/workbuddy`,
+  `POST /config/restore/workbuddy`): one entry per active WorkBuddy rule
+  (`id`/`name` = request model, `vendor` "Tingly Box", `url` =
+  `{base}/tingly/workbuddy/v1/chat/completions`, `supportsToolCall` true, images and
+  reasoning false). Ownership is by URL (`/tingly/workbuddy/`) — the schema has no
+  metadata field — so only our entries are replaced; user entries and unknown
+  top-level keys are preserved. An id already used by a user entry is skipped and
+  reported, not overwritten. `availableModels`, when present and non-empty, is kept
+  consistent (stale managed ids dropped, written ids added) because it filters the
+  picker after merging. Refuses (touches nothing) if the file is not a JSON object;
+  backs up first; atomic write; keeps existing permissions, new file 0600 (holds an
+  API key). No rules → nothing is written and the user is told to add a rule (no
+  phantom default model). Not done: the `agent apply/restore workbuddy` CLI path
+  (`ai/agent`, a separately versioned module that intentionally duplicates the
+  writer) — add it if the CLI needs parity.
 - **Unverified end to end:** SSE/tool-call behaviour against the routed models.
 
 ## Sources
