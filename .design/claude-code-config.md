@@ -340,6 +340,15 @@ compact grouped search exposes the remaining overridable runtime fields without
 showing inherited values as editable noise. The card-scoped save action is
 labeled **Save**, while generated files remain a rebuildable runtime artifact.
 
+Each override row reads as "inherited X → override Y": the concrete inherited
+value sits next to the control (and next to each option in the Add picker), so
+the user sees what they are changing from without leaving the card. The field
+purpose is inline rather than behind an info icon. Edits are staged: changed
+rows get a left accent and an inline **Unsaved changes** bar offers
+**Discard** / **Save**, so a mistaken edit can be undone without touching the
+server. **Restore inheritance** (clear every saved override) is a labeled
+button shown only when saved overrides exist.
+
 The five model env keys (`ANTHROPIC_MODEL`, the Haiku/Sonnet/Opus slots, and
 `CLAUDE_CODE_SUBAGENT_MODEL`) are deliberately excluded from Profile Overrides.
 They are derived artifacts owned by the profile's **Model Rules** below the

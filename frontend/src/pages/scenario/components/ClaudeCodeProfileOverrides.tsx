@@ -25,7 +25,7 @@ import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { resolveLanguage } from '@/i18n';
 import UnifiedCard from '@/components/UnifiedCard';
-import { Add, Close, InfoOutlined, RestartAlt, Search } from '@/components/icons';
+import { Add, ArrowForward, Close, RestartAlt, Search } from '@/components/icons';
 import { api } from '@/services/api';
 import {
     CLAUDE_CODE_DEFAULT_MODE_OPTIONS,
@@ -58,7 +58,13 @@ const TEXT = {
         title: 'Profile 覆盖',
         inherited: '当前完全继承主配置和模型路由',
         pendingInheritance: '覆盖已移除；保存 Profile 后恢复继承',
-        hint: '未列出的参数继续继承；启动时自动生成运行配置。',
+        hint: '只有这里列出的参数与主配置不同，其余全部继承。',
+        inheritedFrom: '继承值',
+        notSet: '未设置',
+        on: '开',
+        off: '关',
+        unsaved: '有未保存的更改',
+        discard: '放弃',
         add: '添加',
         closeAdd: '关闭',
         search: '搜索可覆盖的运行参数',
@@ -74,6 +80,7 @@ const TEXT = {
         save: '保存',
         saved: 'Profile 覆盖已保存',
         restoreAll: '全部恢复继承',
+        restoreAllShort: '恢复继承',
         restoreTitle: '清除全部 Profile 覆盖？',
         restoreBody: '这只会清除当前 Profile 的运行参数覆盖；主配置、模型路由和 Profile 本身不会变化。',
         restored: '已恢复继承主配置和模型路由',
@@ -86,7 +93,13 @@ const TEXT = {
         title: 'Profile Overrides',
         inherited: 'Fully inherits the main configuration and model routing',
         pendingInheritance: 'Overrides removed; save the profile to restore inheritance',
-        hint: 'Unlisted settings keep inheriting; runtime settings are generated automatically at launch.',
+        hint: 'Only the settings listed here differ from the main configuration; everything else is inherited.',
+        inheritedFrom: 'Inherited',
+        notSet: 'Not set',
+        on: 'On',
+        off: 'Off',
+        unsaved: 'Unsaved changes',
+        discard: 'Discard',
         add: 'Add',
         closeAdd: 'Close',
         search: 'Search runtime settings',
@@ -102,6 +115,7 @@ const TEXT = {
         save: 'Save',
         saved: 'Profile overrides saved',
         restoreAll: 'Restore all inheritance',
+        restoreAllShort: 'Restore inheritance',
         restoreTitle: 'Clear all profile overrides?',
         restoreBody: 'This only clears runtime overrides for this profile. The main configuration, model routing, and profile remain unchanged.',
         restored: 'Main configuration and model routing inheritance restored',
@@ -114,7 +128,13 @@ const TEXT = {
         title: 'Переопределения профиля',
         inherited: 'Полностью наследует основную конфигурацию и маршрутизацию моделей',
         pendingInheritance: 'Переопределения удалены; сохраните профиль, чтобы вернуть наследование',
-        hint: 'Неуказанные параметры продолжают наследоваться; рабочие настройки создаются автоматически при запуске.',
+        hint: 'Отличаются от основной конфигурации только перечисленные здесь параметры; остальное наследуется.',
+        inheritedFrom: 'Наследуется',
+        notSet: 'Не задано',
+        on: 'Вкл',
+        off: 'Выкл',
+        unsaved: 'Есть несохранённые изменения',
+        discard: 'Отменить',
         add: 'Добавить',
         closeAdd: 'Закрыть',
         search: 'Поиск рабочих параметров',
@@ -130,6 +150,7 @@ const TEXT = {
         save: 'Сохранить',
         saved: 'Переопределения профиля сохранены',
         restoreAll: 'Вернуть всё наследование',
+        restoreAllShort: 'Вернуть наследование',
         restoreTitle: 'Очистить все переопределения профиля?',
         restoreBody: 'Будут очищены только переопределения рабочих параметров этого профиля. Основная конфигурация, маршрутизация моделей и сам профиль не изменятся.',
         restored: 'Наследование основной конфигурации и маршрутизации моделей восстановлено',
@@ -191,6 +212,7 @@ const ClaudeCodeProfileOverrides: React.FC<ClaudeCodeProfileOverridesProps> = ({
     const [defaultMode, setDefaultMode] = React.useState<ClaudeCodeDefaultMode>('acceptEdits');
     const [loadedMode, setLoadedMode] = React.useState<ClaudeCodeDefaultMode>('acceptEdits');
     const [selectedKeys, setSelectedKeys] = React.useState<Set<OverrideKey>>(new Set());
+    const [loadedKeys, setLoadedKeys] = React.useState<Set<OverrideKey>>(new Set());
     const [hasOverrides, setHasOverrides] = React.useState(false);
     const [loading, setLoading] = React.useState(true);
     const [savingAction, setSavingAction] = React.useState<'save' | 'restore' | null>(null);
@@ -212,7 +234,9 @@ const ClaudeCodeProfileOverrides: React.FC<ClaudeCodeProfileOverridesProps> = ({
         setInheritedMode(nextInheritedMode);
         setDefaultMode(nextMode);
         setLoadedMode(nextMode);
-        setSelectedKeys(deriveOverrideKeys(nextBase, nextPrefs, nextInheritedMode, nextMode));
+        const nextKeys = deriveOverrideKeys(nextBase, nextPrefs, nextInheritedMode, nextMode);
+        setSelectedKeys(nextKeys);
+        setLoadedKeys(nextKeys);
         setHasOverrides(!!result.data.hasOverrides);
         onArtifactChange?.({
             settingsPath: result.data.settingsPath || '',
@@ -249,6 +273,11 @@ const ClaudeCodeProfileOverrides: React.FC<ClaudeCodeProfileOverridesProps> = ({
     const availableCommon = COMMON_KEYS.filter(key => !selectedKeys.has(key));
     const availableMore = FIELD_ORDER.filter(key => !COMMON_KEYS.includes(key) && !selectedKeys.has(key));
     const isDirty = !prefsEqual(prefs, loadedPrefs) || defaultMode !== loadedMode;
+    // Marks the rows the pending Save will write. Value-based (like isDirty), so
+    // a freshly added row still holding its inherited value stays unmarked.
+    const isRowChanged = (key: OverrideKey) => key === 'defaultMode'
+        ? defaultMode !== loadedMode
+        : (prefs[key] ?? '') !== (loadedPrefs[key] ?? '');
     const saving = savingAction !== null;
 
     const addOverride = (key: OverrideKey) => {
@@ -275,6 +304,13 @@ const ClaudeCodeProfileOverrides: React.FC<ClaudeCodeProfileOverridesProps> = ({
                 return next;
             });
         }
+        setMessage(null);
+    };
+
+    const discardChanges = () => {
+        setPrefs(loadedPrefs);
+        setDefaultMode(loadedMode);
+        setSelectedKeys(loadedKeys);
         setMessage(null);
     };
 
@@ -399,6 +435,16 @@ const ClaudeCodeProfileOverrides: React.FC<ClaudeCodeProfileOverridesProps> = ({
         : availableKeys;
     const availableGroups = [...new Set(filteredAvailableKeys.map(fieldGroup))]
         .map(group => ({ group, keys: filteredAvailableKeys.filter(key => fieldGroup(key) === group) }));
+    // The concrete value this profile would run with if the override were
+    // removed, so each row reads as "inherited X → override Y".
+    const inheritedDisplay = (key: OverrideKey): string => {
+        if (key === 'defaultMode') return modeText[inheritedMode].label;
+        const field = FIELD_BY_KEY.get(key);
+        const value = basePrefs[key] ?? '';
+        if (field?.kind === 'bool') return value === '1' ? text.on : text.off;
+        if (!value) return text.notSet;
+        return field?.unit ? `${value} ${field.unit}` : value;
+    };
 
     return (
         <UnifiedCard
@@ -414,19 +460,21 @@ const ClaudeCodeProfileOverrides: React.FC<ClaudeCodeProfileOverridesProps> = ({
             }}
             rightAction={(
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
-                    {!loading && !loadError && (hasOverrides || isDirty) && (
+                    {!loading && !loadError && hasOverrides && (
                         <Tooltip title={text.restoreAll} arrow>
                             <span>
-                                <IconButton
+                                <Button
                                     size="small"
-                                    aria-label={text.restoreAll}
+                                    color="inherit"
+                                    startIcon={savingAction === 'restore'
+                                        ? <CircularProgress size={14} color="inherit" />
+                                        : <RestartAlt fontSize="small" />}
                                     onClick={() => setRestoreOpen(true)}
                                     disabled={saving}
+                                    sx={{ color: 'text.secondary' }}
                                 >
-                                    {savingAction === 'restore'
-                                        ? <CircularProgress size={16} color="inherit" />
-                                        : <RestartAlt fontSize="small" />}
-                                </IconButton>
+                                    {text.restoreAllShort}
+                                </Button>
                             </span>
                         </Tooltip>
                     )}
@@ -442,17 +490,12 @@ const ClaudeCodeProfileOverrides: React.FC<ClaudeCodeProfileOverridesProps> = ({
                     >
                         {addOpen ? text.closeAdd : text.add}
                     </Button>
-                    {isDirty && (
-                        <Button size="small" variant="contained" onClick={handleSave} disabled={saving}>
-                            {savingAction === 'save' ? <CircularProgress size={15} color="inherit" /> : text.save}
-                        </Button>
-                    )}
                 </Box>
             )}
         >
             {loading ? (
                 <Box sx={{ display: 'flex', justifyContent: 'center', py: 1 }}><CircularProgress size={20} /></Box>
-            ) : orderedSelectedKeys.length === 0 ? (
+            ) : orderedSelectedKeys.length === 0 && !addOpen ? (
                 <Box>
                     <Typography variant="body2" color="text.secondary">{isDirty ? text.pendingInheritance : text.inherited}</Typography>
                 </Box>
@@ -461,60 +504,71 @@ const ClaudeCodeProfileOverrides: React.FC<ClaudeCodeProfileOverridesProps> = ({
             <Collapse in={!loading && orderedSelectedKeys.length > 0} unmountOnExit>
                 <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1.5, overflow: 'hidden' }}>
                     <Stack divider={<Divider flexItem sx={{ mx: 1.5 }} />}>
-                        {orderedSelectedKeys.map(key => (
-                            <Box
-                                key={key}
-                                sx={{
-                                    display: 'grid',
-                                    alignItems: 'center',
-                                    gridTemplateColumns: {
-                                        xs: 'minmax(0, 1fr) auto',
-                                        sm: 'minmax(220px, 1fr) minmax(180px, 320px) auto',
-                                    },
-                                    columnGap: 1.5,
-                                    rowGap: 1,
-                                    minHeight: 64,
-                                    px: 1.5,
-                                    py: 1.25,
-                                }}
-                            >
-                                <Box sx={{ minWidth: 0 }}>
-                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                        <Typography variant="body2" noWrap sx={{ fontWeight: 600, color: 'text.primary' }}>{fieldLabel(key)}</Typography>
-                                        <Tooltip title={fieldPurpose(key)} arrow>
-                                            <InfoOutlined sx={{ fontSize: 14, color: 'text.disabled', cursor: 'help' }} />
-                                        </Tooltip>
-                                    </Box>
-                                    <Box component="span" sx={{ ...CLAUDE_CONFIG_KEY_SX, display: 'inline-block', mt: 0.5 }}>{fieldBadge(key)}</Box>
-                                </Box>
+                        {orderedSelectedKeys.map(key => {
+                            const changed = isRowChanged(key);
+                            return (
                                 <Box
+                                    key={key}
                                     sx={{
-                                        minWidth: 0,
-                                        display: 'flex',
+                                        display: 'grid',
                                         alignItems: 'center',
-                                        justifyContent: { xs: 'flex-start', sm: 'flex-end' },
-                                        gridColumn: { xs: '1 / -1', sm: '2' },
-                                        gridRow: { xs: '2', sm: '1' },
+                                        gridTemplateColumns: {
+                                            xs: 'minmax(0, 1fr) auto',
+                                            md: 'minmax(240px, 1fr) auto auto',
+                                        },
+                                        columnGap: 1.5,
+                                        rowGap: 1,
+                                        minHeight: 64,
+                                        px: 1.5,
+                                        py: 1.25,
+                                        // Unsaved rows get a left accent so the pending Save has a visible scope.
+                                        boxShadow: theme => changed ? `inset 3px 0 0 ${theme.palette.primary.main}` : 'none',
                                     }}
                                 >
-                                    {renderControl(key)}
-                                </Box>
-                                <Tooltip title={text.remove} arrow>
-                                    <IconButton
-                                        size="small"
-                                        aria-label={text.remove}
-                                        onClick={() => removeOverride(key)}
-                                        disabled={saving}
+                                    <Box sx={{ minWidth: 0 }}>
+                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 0 }}>
+                                            <Typography variant="body2" noWrap sx={{ fontWeight: 600, color: 'text.primary', flexShrink: 0 }}>{fieldLabel(key)}</Typography>
+                                            <Box component="span" sx={{ ...CLAUDE_CONFIG_KEY_SX, flexShrink: 1, minWidth: 0 }}>{fieldBadge(key)}</Box>
+                                        </Box>
+                                        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.25 }}>
+                                            {fieldPurpose(key)}
+                                        </Typography>
+                                    </Box>
+                                    <Box
                                         sx={{
-                                            gridColumn: { xs: '2', sm: '3' },
-                                            gridRow: '1',
+                                            minWidth: 0,
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: 1.25,
+                                            justifyContent: { xs: 'flex-start', md: 'flex-end' },
+                                            gridColumn: { xs: '1 / -1', md: '2' },
+                                            gridRow: { xs: '2', md: '1' },
                                         }}
                                     >
-                                        <Close fontSize="small" />
-                                    </IconButton>
-                                </Tooltip>
-                            </Box>
-                        ))}
+                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, whiteSpace: 'nowrap' }}>
+                                            <Typography variant="caption" color="text.disabled">{text.inheritedFrom}</Typography>
+                                            <Typography variant="caption" sx={{ fontFamily: key === 'defaultMode' ? undefined : fontMono, color: 'text.secondary' }}>{inheritedDisplay(key)}</Typography>
+                                            <ArrowForward sx={{ fontSize: 14, color: 'text.disabled' }} />
+                                        </Box>
+                                        {renderControl(key)}
+                                    </Box>
+                                    <Tooltip title={text.remove} arrow>
+                                        <IconButton
+                                            size="small"
+                                            aria-label={text.remove}
+                                            onClick={() => removeOverride(key)}
+                                            disabled={saving}
+                                            sx={{
+                                                gridColumn: { xs: '2', md: '3' },
+                                                gridRow: '1',
+                                            }}
+                                        >
+                                            <Close fontSize="small" />
+                                        </IconButton>
+                                    </Tooltip>
+                                </Box>
+                            );
+                        })}
                     </Stack>
                 </Box>
             </Collapse>
@@ -570,6 +624,7 @@ const ClaudeCodeProfileOverrides: React.FC<ClaudeCodeProfileOverridesProps> = ({
                                         }}
                                     >
                                         <Typography variant="body2" sx={{ flex: 1, minWidth: 0, fontWeight: 500 }}>{fieldLabel(key)}</Typography>
+                                        <Typography variant="caption" color="text.secondary" noWrap sx={{ fontFamily: key === 'defaultMode' ? undefined : fontMono, flexShrink: 0 }}>{inheritedDisplay(key)}</Typography>
                                         <Box component="span" sx={{ ...CLAUDE_CONFIG_KEY_SX, flexShrink: 1 }}>{fieldBadge(key)}</Box>
                                     </ButtonBase>
                                 ))}
@@ -581,6 +636,28 @@ const ClaudeCodeProfileOverrides: React.FC<ClaudeCodeProfileOverridesProps> = ({
                             </Typography>
                         )}
                     </Box>
+                </Box>
+            </Collapse>
+
+            <Collapse in={!loading && isDirty} unmountOnExit>
+                <Box
+                    sx={{
+                        mt: 1.25,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 1,
+                        px: 1.5,
+                        py: 0.75,
+                        borderRadius: 1.5,
+                        bgcolor: 'action.hover',
+                    }}
+                >
+                    <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: 'primary.main', flexShrink: 0 }} />
+                    <Typography variant="body2" color="text.secondary" sx={{ flex: 1 }}>{text.unsaved}</Typography>
+                    <Button size="small" color="inherit" onClick={discardChanges} disabled={saving}>{text.discard}</Button>
+                    <Button size="small" variant="contained" onClick={handleSave} disabled={saving}>
+                        {savingAction === 'save' ? <CircularProgress size={15} color="inherit" /> : text.save}
+                    </Button>
                 </Box>
             </Collapse>
 
