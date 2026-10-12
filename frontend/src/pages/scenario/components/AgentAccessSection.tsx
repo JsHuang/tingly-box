@@ -61,12 +61,13 @@ export const AgentAccessSection: React.FC<AgentAccessSectionProps> = ({ expanded
     const label = t(expanded ? 'agentAccess.collapse' : 'agentAccess.expand');
     // Folded and open are two different buttons, so toggling would drop keyboard
     // focus to the page: hand it to the new one.
-    const toggleRef = useRef<HTMLElement | null>(null);
+    const toggleEl = useRef<HTMLElement | null>(null);
+    const toggleRef = useCallback((el: HTMLElement | null) => { toggleEl.current = el; }, []);
     const refocus = useRef(false);
     useEffect(() => {
         if (refocus.current) {
             refocus.current = false;
-            toggleRef.current?.focus();
+            toggleEl.current?.focus();
         }
     }, [expanded]);
     const handleToggle = () => {
