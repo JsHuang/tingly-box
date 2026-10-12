@@ -219,17 +219,35 @@ OAuth. Same shape as Pi/Xcode: a scenario + a guide page.
 - **Shown by default** (v7 of the hidden-agents defaults; `custom` too). A
   one-time migration clears `custom`/`workbuddy` from stored hidden lists; hiding
   them afterwards is stored explicitly and respected.
-- **No file-based config, and no auto-config — deliberately.** The official
-  WorkBuddy doc says the UI needs "no configuration file editing" and mentions
-  only the *legacy* `~/.codebuddy/models.json` (still honoured, migrated into the
-  UI). The Tencent Cloud doc says "`workbuddy/models.json`" (no leading dot).
-  `~/.workbuddy/models.json` appears only in third-party guides (apiyi, CloudBase,
-  LongCat, CSDN), which also disagree on the top-level shape (`{"models":[…]}`
-  vs a bare array) and on whether a full restart is needed. Until Tencent
-  documents the file the desktop app actually reads and writes, writing it for
-  the user could silently do nothing or clobber their config, so the guide
-  shows UI steps only. Revisit auto-config (OpenCode/DSH pattern +
-  client-config-status chip) if/when that is confirmed on a real install.
+- **No file-based config / auto-config yet — evidence (re-checked 2026-10-12):**
+  - *Official, `~/.codebuddy/models.json`* (user) and `<workspace>/.codebuddy/models.json`
+    (project, wins on same `id`): Tencent Cloud "WorkBuddy Enterprise 模型配置"
+    (cloud.tencent.com.cn/document/product/1831/137010) and workbuddy.ai
+    `/docs/cli/models`. Schema: top-level `models[]` + optional `availableModels[]`;
+    fields `id`(required) `name` `vendor` `apiKey` `url` `maxInputTokens`
+    `maxOutputTokens` `temperature` `api` `supportsToolCall` `supportsImages`
+    `supportsReasoning` `relatedModels`; `url` must be the full endpoint
+    (`…/chat/completions`); `${ENV}` substitution; **hot reload** (1 s debounce).
+    Release notes: custom models in `.codebuddy/models.json` since 1.2.8/1.2.9
+    (2025-11); 4.9.12 added a `modelId` field; 4.10.0 (2026-07-10) added "model
+    config sync" and fixed an `availableModels` whitelist bug "when backend config
+    exists". **Scope caveat:** these pages describe *CodeBuddy Code* (CLI/IDE) under
+    WorkBuddy Enterprise, not explicitly the personal WorkBuddy desktop app. The
+    WorkBuddy desktop doc only says models "previously configured via
+    `~/.codebuddy/models.json`" still work and can be managed in the UI.
+  - *Third-party, `~/.workbuddy/models.json`* (LongCat, UniKey, CSDN guides):
+    same `{"models":[…]}` shape, "restart WorkBuddy fully", UTF-8 no BOM, and the
+    LongCat page labels the GUI route "新版推荐" (recommended for newer versions).
+    Tencent Cloud's personal doc says only "`workbuddy/models.json`" (no dot).
+  - **No release note or doc announcing a move/rename of the file was found.**
+    The two directories most likely differ by product (CodeBuddy vs the WorkBuddy
+    desktop app) rather than by version, but that is inference, not confirmation.
+  - Therefore no file snippet and no auto-config in the guide. If we add it, the
+    only officially documented target is `~/.codebuddy/models.json`; a safe
+    implementation must merge (touch only an entry we own, keep the user's other
+    models), write atomically, never create the file blind for the desktop app, and
+    show a status chip. Needs a real WorkBuddy install to confirm which file the
+    desktop app reads.
 - **Unverified end to end:** SSE/tool-call behaviour against the routed models.
 
 ## Sources
