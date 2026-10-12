@@ -1,6 +1,6 @@
 import { Box, ButtonBase, Card, Collapse, Tooltip, Typography } from '@mui/material';
 import { ExpandMore as ExpandMoreIcon } from '@/components/icons';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { fontMono } from '@/theme/fonts';
 import ConfigRow from '@/components/ConfigRow';
@@ -59,6 +59,20 @@ export interface AgentAccessSectionProps {
 export const AgentAccessSection: React.FC<AgentAccessSectionProps> = ({ expanded, onToggle, url, children }) => {
     const { t } = useTranslation();
     const label = t(expanded ? 'agentAccess.collapse' : 'agentAccess.expand');
+    // Folded and open are two different buttons, so toggling would drop keyboard
+    // focus to the page: hand it to the new one.
+    const toggleRef = useRef<HTMLElement | null>(null);
+    const refocus = useRef(false);
+    useEffect(() => {
+        if (refocus.current) {
+            refocus.current = false;
+            toggleRef.current?.focus();
+        }
+    }, [expanded]);
+    const handleToggle = () => {
+        refocus.current = true;
+        onToggle();
+    };
     // The same fold control as the rule card's header (ModelRequestHeader): a
     // chevron, turned over while open, grey until hovered.
     const chevron = (
@@ -87,8 +101,9 @@ export const AgentAccessSection: React.FC<AgentAccessSectionProps> = ({ expanded
             {expanded ? (
                 <Tooltip title={label}>
                     <ButtonBase
+                        ref={toggleRef}
                         className="agent-access-toggle"
-                        onClick={onToggle}
+                        onClick={handleToggle}
                         aria-expanded
                         aria-label={label}
                         sx={{ position: 'absolute', top: 12, right: 22, zIndex: 1, p: 0.25, borderRadius: 1 }}
@@ -101,9 +116,10 @@ export const AgentAccessSection: React.FC<AgentAccessSectionProps> = ({ expanded
                 // grid) — only the actions on its right are left out — so folding and
                 // unfolding never moves it. The whole row is the button.
                 <ButtonBase
+                    ref={toggleRef}
                     component="div"
                     className="agent-access-toggle"
-                    onClick={onToggle}
+                    onClick={handleToggle}
                     aria-expanded={false}
                     aria-label={label}
                     sx={{ display: 'block', width: '100%', textAlign: 'left', '&:hover': { backgroundColor: 'action.hover' } }}
