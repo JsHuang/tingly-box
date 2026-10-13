@@ -1,6 +1,7 @@
 # Harness Relay — 用 harness 测任意中转网关（提案）
 
-> 状态：**提案，尚未实现。** 文中的开关、模型名和 `/virtual/captures` 都还不存在。
+> 状态：**第 1 阶段（tb1 侧）已实现**（`vmodel/harnessupstream`，`tingly-box start --harness-upstream`）；
+> 第 2、3 阶段（harness 侧）仍是提案。
 > 流程图见 [`harness-relay.pencil.md`](./harness-relay.pencil.md)，本文是契约与取舍的权威来源。
 >
 > 相关：[`harness-matrix.md`](./harness-matrix.md)（被移植的套件）、
@@ -32,11 +33,11 @@ tb1 是真实可部署的 tingly-box 进程，所以既能由 harness 拉起，�
 
 | 决定 | 内容 | 理由 |
 |---|---|---|
-| 不新开路由前缀 | 场景注册进现有 anthropic / openai 注册表，走 `/virtual/anthropic/v1/messages`、`/virtual/openai/v1/{chat/completions,responses}` | vmodel 本来就是做虚拟上游的，harness 只是它的一种用途；中转对接方式与普通虚拟模型完全一样 |
-| 启动开关 | `--harness-upstream`（暂定）打开时才注册 | `vmodel/README.md` 的注册纪律：`RegisterDefaults` 里的东西对生产终端用户可见，测试夹具必须 opt-in。先例是 duo 的 `registerDuoStreamModels` |
+| 不新开路由前缀 | 场景挂在现有的 `/virtual/anthropic/v1/messages`、`/virtual/openai/v1/{chat/completions,responses}` 上 | vmodel 本来就是做虚拟上游的，harness 只是它的一种用途；中转对接方式与普通虚拟模型完全一样 |
+| 启动开关 | `tingly-box start --harness-upstream` 打开时才挂载（`server.WithHarnessUpstream`） | `vmodel/README.md` 的注册纪律：`RegisterDefaults` 里的东西对生产终端用户可见，测试夹具必须 opt-in。先例是 duo 的 `registerDuoStreamModels` |
 | 模型名前缀 | 场景 `text` → 模型 `harness-text` | 场景名太通用，避免和现有模型撞名 |
-| 适配层 | 把 `benchmark/scenario.Scenario` 包成 `anthropic.VirtualModel` / `openai.VirtualModel` | `Scenario` 只实现了基础 `vmodel.VirtualModel`（`scenario.go`），没有 `HandleAnthropic` 等协议方法 |
-| 请求记录 | `/virtual/captures`，同样受开关控制，按关联键返回 tb1 收到的原始请求 | content_shapes、cache_controls、cache_prefix、thinking_limits 断言的是"上游收到了什么"，tb1 独立进程后不能再同进程读 |
+| 原样回放 fixture，不做适配 | `/virtual` 两个路由组前加一层中间件：模型是 `harness-*` 就交给 `benchmark.NewScenarioServer()` 回场景的原始线上 fixture 并中止；其他模型照常进 vmodel handler | 场景 fixture 是逐协议手写的原始字节（含 Responses、thinking、错误、多轮 `StreamFor`），翻译成 vmodel 的类型化响应会丢细节。原样回放与进程内 matrix 用的是同一份字节 |
+| 请求记录 | `GET /virtual/captures?request_id=&model=&limit=`（新到旧，默认 20 条）、`DELETE` 清空；只记录 `/virtual` 的 POST，**包括非 harness 模型**，最多 512 条；`Authorization` / `X-Api-Key` / `Api-Key` 替换成 `[redacted]` | content_shapes、cache_controls、cache_prefix、thinking_limits 断言的是"上游收到了什么"，tb1 独立进程后不能再同进程读 |
 | 鉴权 | 沿用 `/virtual` 现有的 model token 中间件（`server_routes.go` `UseVirtualModelEndpoints`） | 中转那边按普通上游填 key |
 
 ### 关联键
@@ -84,11 +85,11 @@ routes:             # 目标协议 → 发给中转的模型名（中转里配�
 
 ## 6. 已知取舍与待决
 
-- **Responses fixture 被绕过。** openai 注册表里的模型在 `/responses` 上是把 Chat 输出
-  转换成 Responses 格式返回的，场景里手写的 Responses fixture 用不到。内容语义断言不受
-  影响，Responses 特有的事件形状测不到。第一版接受。
-- **错误场景**（`error`、`error-500`、`error-midstream-close` 等）要靠适配层表达成 HTTP
-  错误或中途断流，需对照 `vmodel/error_injection.go` 确认能覆盖。
+- **`/models` 不列出 `harness-*`。** 中间件只拦 POST；模型清单由 virtualserver 生成。需要
+  "拉取模型列表"才能配置的中转，第一版要手填模型名。
+- **记录非 harness 模型的请求是刻意的。** 中转改写了模型名时，请求会落到普通 vmodel 上，
+  这时 capture 正是暴露问题的地方。
+- **错误场景** 直接沿用 fixture 的状态码和中途断流（`StreamHTTPError`、`error-midstream-close`），无需额外表达。
 - **模型名被改写。** 很多中转会把模型名重写成固定上游模型，此时只能靠请求头或单场景运行。
 - **"正确"的定义。** 部分期望值带有 tingly 的取舍（usage 拆分、finish reason 映射）。
   外部模式下是否降级为 warning，待定。
@@ -97,7 +98,7 @@ routes:             # 目标协议 → 发给中转的模型名（中转里配�
 
 ## 7. 分阶段
 
-1. tb1 侧：开关 + 场景注册与适配层 + `/virtual/captures`。验收：现有 duo 拓扑下，
+1. ✅ tb1 侧：开关 + `harness-*` 场景回放 + `/virtual/captures`（`internal/server/harness_upstream_test.go`）。验收：现有 duo 拓扑下，
    tb2 指向 `harness-*` 模型跑 single，结果与进程内一致。
 2. harness 侧：`Gateway` 接口重构（零行为变化）+ `--gateway` profile + 可移植 section。
    验收：把 tingly-box 自己当外部网关跑一遍。

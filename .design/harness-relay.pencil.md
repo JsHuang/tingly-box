@@ -1,7 +1,7 @@
 # Harness Relay 拓扑与请求流程 (pencil)
 
 [`harness-relay.md`](./harness-relay.md) 的配套图：harness 怎样隔着一个第三方网关，
-用 tb1 的 vmodel 作上游跑 matrix。**提案，尚未实现**；图与正文不一致时以正文为准。
+用 tb1 的 vmodel 作上游跑 matrix。§2 已实现，其余是提案；图与正文不一致时以正文为准。
 
 图例：`▶` 入口 · `◇` 分支 · `✖` 跳过/失败 · `⎘` 记录
 
@@ -28,21 +28,26 @@
 ## 2. tb1 启动：测试模型怎样进 `/virtual`
 
 ```
-  ▶ tingly-box serve [--harness-upstream]
+  ▶ tingly-box start [--harness-upstream]
    RegisterDefaults(anthropic, openai)            面向用户的 demo 模型，始终注册
    ◇ --harness-upstream？                          否 → 到此为止，生产实例看不到任何 harness-*
-   for s in benchmark/scenario builtins:
-       包成 anthropic.VirtualModel / openai.VirtualModel（适配层）
-       注册为 harness-<s.Name>                    text → harness-text，tool_use → harness-tool_use …
-   挂载 /virtual/captures
+   harnessupstream.New()：scenario.AllScenarios() 改名 harness-<name>，注册进 benchmark 场景服务
+   /virtual/{openai,anthropic} 路由组：model auth → Intercept → vmodel handler
+   挂载 GET / DELETE /virtual/captures
+
+  一次 POST 经过 Intercept：
+   ⎘ 记录（任何模型）
+   ◇ 路径是 chat/completions · responses · messages，且模型是 harness-*？
+       是 → 场景服务回原始 fixture（流式 / 非流式 / 错误状态），Abort
+       否 → c.Next()，普通 vmodel 照常处理
 ```
 
 | 路由 | 开关关 | 开关开 |
 |---|---|---|
 | `/virtual/anthropic/v1/messages` | demo 模型 | demo 模型 + `harness-*` |
 | `/virtual/openai/v1/chat/completions` | demo 模型 | demo 模型 + `harness-*` |
-| `/virtual/openai/v1/responses` | demo 模型 | demo 模型 + `harness-*`（Chat 输出转 Responses，见正文 §6） |
-| `/virtual/*/v1/models` | demo 模型 | 列表里多出 `harness-*` |
+| `/virtual/openai/v1/responses` | demo 模型 | demo 模型 + `harness-*`（场景自己的 Responses fixture） |
+| `/virtual/*/v1/models` | demo 模型 | 不变（不列出 `harness-*`，见正文 §6） |
 | `/virtual/captures` | 404 | 返回收到的请求 |
 
 ## 3. 一条用例的走向
