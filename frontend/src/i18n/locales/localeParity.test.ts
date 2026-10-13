@@ -41,7 +41,7 @@ describe('locale bundles', () => {
     // copy inline as t(..., { defaultValue }) and are only overridden in the
     // non-English bundles; keep ru from falling behind zh on those. There is no
     // en -> zh assertion in return: zh deliberately omits
-    // scenarioOverview.descriptions so those fall back to English (see zh/scenarioOverview.ts).
+    // scenarioOverview.descriptions so those fall back to English (see zh/agent.ts).
     it('ru covers every key in zh', () => {
         expect(missingFrom(zhKeys, ruKeys)).toEqual([]);
     });
