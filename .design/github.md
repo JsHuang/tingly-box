@@ -4,7 +4,8 @@
 > agent、为什么每个用户各建一个 GitHub App，以及第一版要做什么、不做什么。
 > 方案对比与评估过程见项目文档《GitHub 集成方案评估》（2026-10-15）；这里只写定下来的契约。
 
-状态：提案，尚未实现。
+状态：第 1、2 阶段已实现（`internal/github`、`internal/server/module/github`），第 3 阶段未做。
+与最初方案的出入记在 §11。
 
 ---
 
@@ -73,7 +74,7 @@ Desk / @cc 在用户目录原地跑 Claude Code，进程跑在用户账号下，
 
 - 新表（SQLite，`internal/db`）：
   - `github_apps`：id, slug, owner, client_id, client_secret, webhook_secret,
-    private_key（加密存储方式与现有 provider key 相同）, created_at。
+    private_key（与现有 provider key 一样存在本机 SQLite 里，目录权限 0700，没有额外加密）, created_at。
   - `github_installations`：installation_id, app_id, account, repository_selection,
     updated_at。仓库列表不落库，按需用 `GET /installation/repositories` 查。
   - `github_pats`：兜底 PAT，结构同 provider credential。
@@ -153,3 +154,31 @@ check-runs、review comments，带 `If-None-Match`（304 不扣配额）。有�
 - `permissions.deny` 对 `gh api` 写方法的匹配写法，以及与用户已有 settings 的合并顺序。
 - 常驻进程换 token 的频率是否会明显打断长会话；必要时改为经 tb 本地代理下发 token
   （`gh` 的 `GH_HOST` / credential helper 路线）。
+
+## 11. 实现记录与和方案的出入
+
+- **deny 规则走 `--disallowedTools`，不改生成的 settings 文件。** `ExecutionOptions.DisallowedTools`
+  已经是 `--disallowedTools`，对 Desk、@cc、profile settings 一视同仁，也不存在“合并进用户已有
+  规则”的顺序问题（§10 第二条）。同样，system prompt 提示走 `AppendSystemPrompt`，MCP 挂载走
+  `ExecutionOptions.MCPServers`（`--mcp-config`）。入口只有一个：`github.Prepare(ctx, launcher, dir, sessionID, &opts)`，
+  Desk 的 `launchOptions` 和 @cc 的 `ClaudeCodeExecutor` 各调一次。
+- **launcher 为 nil 或 flag 关闭时仍然加固。** 阶段 1 的 env、deny、prompt 不依赖 App，也不依赖 `github`
+  flag；flag 只控制连接流程、读 token 注入和写工具。
+- **guardrails 同名策略是内置模板**（`block-github-write-commands`，`enabled: false`），和其它内置
+  策略一样需要用户启用 guardrails；它补 deny 规则拦不到的 `bash -c` 形式。
+- **回调走 Engine，不走鉴权组。** GitHub 的两次浏览器跳转（`/github/manifest/callback`、
+  `/github/install/callback`）没有 tb 的登录态，靠 `StartConnect` 发的一次性 state（1 小时，用后即焚）授权；
+  MCP 端点 `/github/mcp` 靠每个会话一个 bearer（`tbgh-…`，同一会话稳定，进程内存里，重启后随会话重新签发）。
+  三者都受 `github` flag 控制，关闭时 404。
+- **读 token 在剩余不足 15 分钟时重铸**，所以常驻进程的 `GH_TOKEN` 大约每 45 分钟变一次，
+  触发 `launchSignature` 变化而重开进程（§6）。写 token 剩余 5 分钟内重铸，且从不离开 tb 进程。
+- **PAT 模式**：写工具用 PAT，agent 的 `gh` 不注入 token（§1.4）。
+- **`tb_push` 的安全细节**：`--no-verify`（用户的 pre-push hook 看不到 token）、refspec 不带 `+`、
+  `credential.helper=` 清空、askpass 脚本写临时目录用完即删、输出里的 token 替换成 `***`。
+  目前不支持 Windows（askpass 是 sh 脚本）。
+- **没做**：Projects 线程接入（本仓库当前没有 `projects/`，`Host.ThreadEnv` 接入点待它到位后用
+  同一个 `github.Prepare`）；“同一仓库第一次开 PR 走 Prompter 问一次”（Desk 的审批通道还没有给 MCP
+  工具用的入口）；第 3 阶段事件回流。
+- **待验证（接 §10）**：`gh api -X POST` 等写方法的 deny 前缀写法在 Claude Code 里的实际匹配范围，
+  现在列了 `-X`、`--method`、`-f`、`-F`、`--field`、`--raw-field`、`--input` 几个前缀，
+  其余形态靠 guardrails 策略兜底。
