@@ -40,7 +40,12 @@ export default {
     "saved": "Сохранено"
   },
   "layout": {
+    "workingFolders": "Рабочие папки",
+    "noWorkingFolders": "Рабочих папок пока нет",
+    "workingFolderWaiting": "Ждут вашего ответа: {{count}}",
     "desk": "Рабочее место",
+    "projects": "Проекты",
+    "projectsWaiting": "Поток ждёт вашего ответа",
     "appTitle": "Tingly Box",
     "slogan": "Ваш интеллект под управлением.",
     "version": "версия<br/>{{version}}",
@@ -298,6 +303,9 @@ export default {
       "useToken": "Не получается создать App? Используйте персональный токен доступа"
     },
     "experimentalFeatures": {
+      "projects": "Проекты",
+      "enableProjects": "Передавайте проекту задачи по мере появления: координатор запускает каждую как поток Claude Code в отдельном git worktree.",
+      "projectsEnabledInfo": "Теперь любой, кто может войти в этот tingly-box, может запускать потоки Claude Code на этой машине — в репозиториях, указанных в его проектах.",
       "desk": "Рабочее место",
       "enableDesk": "Запускайте Claude Code на этой машине из браузера в выбранной папке.",
       "deskEnabledInfo": "Любой пользователь с доступом к этому tingly-box может запускать сеансы Claude Code на этой машине и разрешать их вызовы инструментов.",

@@ -38,6 +38,7 @@ const (
 	ExtensionBench              = "bench"
 	ExtensionDesk               = "desk"
 	ExtensionGitHub             = "github"
+	ExtensionProjects           = "projects"
 )
 
 // KnownExtensionBoolFlags is the single source of truth for which
@@ -70,4 +71,5 @@ var KnownExtensionBoolFlags = map[string]bool{
 	ExtensionBench:      true,
 	ExtensionDesk:       true,
 	ExtensionGitHub:     true,
+	ExtensionProjects:   true,
 }

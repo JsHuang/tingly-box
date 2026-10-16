@@ -51,6 +51,16 @@ func (s *Server) githubEnabled() bool {
 	return s.config.GetScenarioFlag(typ.ScenarioGlobal, constant.ExtensionGitHub)
 }
 
+// projectsEnabled reports whether Projects (a coordinator conversation
+// running Claude Code threads in git worktrees, see .design/projects.md) is
+// turned on. Off by default for the same reason as Desk.
+func (s *Server) projectsEnabled() bool {
+	if s.config == nil {
+		return false
+	}
+	return s.config.GetScenarioFlag(typ.ScenarioGlobal, constant.ExtensionProjects)
+}
+
 func (s *Server) initGuardrailsRuntime() {
 	runtime := s.guardrailsState.Current()
 	if (runtime != nil && runtime.PolicyEngine() != nil) || s.config == nil {

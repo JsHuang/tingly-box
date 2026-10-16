@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { Box } from '@mui/material';
 import { useTranslation } from 'react-i18next';
 import { SCENARIOS, getHiddenScenarios, getPinnedScenarios } from '@/pages/scenario/scenarioRegistry';
@@ -37,6 +37,7 @@ import {
     Extension as IconExtension,
     Code as IconCode,
     TestPipe as IconTestPipe,
+    Folder as IconFolder,
     tablerMui,
 } from '@/components/icons';
 import { IconLibraryPhoto as TablerLibraryPhoto } from '@tabler/icons-react';
@@ -47,6 +48,11 @@ import { useTeamContext } from '@/contexts/TeamContext';
 import { orderTeams, teamPath } from '@/utils/team';
 import type { ActivityItem, NavItem, NavItemBase } from './types';
 import { useBotPlatformSummary } from './useBotPlatformSummary';
+import { useProjectsWaiting } from './useProjectsWaiting';
+
+// The Projects sidebar body carries @tingly/projects; lazy so the package stays
+// out of the eager bundle until the Projects item is open.
+const ProjectsNav = lazy(() => import('@/pages/projects/ProjectsNav'));
 
 const IconLibraryPhoto = tablerMui(TablerLibraryPhoto);
 
@@ -57,7 +63,8 @@ const DASHBOARD_RANGE_PATH = /^\/dashboard\/(today|yesterday|3d|7d|30d|90d)$/;
 
 export function useActivityItems(): ActivityItem[] {
     const { t } = useTranslation();
-    const { skillUser, skillIde, enableGuardrails, enableMCP, enableBench, enableDesk } = useFeatureFlags();
+    const { skillUser, skillIde, enableGuardrails, enableMCP, enableBench, enableDesk, enableProjects } = useFeatureFlags();
+    const projectsWaiting = useProjectsWaiting(enableProjects);
     const { profiles } = useProfileContext();
     const imageProfiles = useImageProfiles();
     const { teams } = useTeamContext();
@@ -294,14 +301,37 @@ export function useActivityItems(): ActivityItem[] {
                     { path: '/image/profile/new', label: t('imageProfile.new', { defaultValue: 'New profile' }), icon: <IconPlus sx={{ fontSize: 20 }} /> },
                 ],
             }] as ActivityItem[] : []),
+            // Projects — every place Claude Code works from the browser:
+            // projects, where a coordinator runs each task as a thread
+            // (.design/projects.md), and Desk's plain working folders
+            // (.design/desk.md). The two keep separate experimental flags;
+            // the item shows with either. Its sidebar lists the projects and
+            // folders themselves (ProjectsNav), not pages. The dot says a
+            // thread waits on you.
+            ...(enableProjects || enableDesk ? [{
+                key: 'projects',
+                icon: <IconFolder sx={{ fontSize: 22 }} />,
+                label: t('layout.projects'),
+                defaultPath: enableProjects ? '/projects' : '/desk',
+                attention: projectsWaiting ? t('layout.projectsWaiting') : undefined,
+                sidebar: (onNavigate: () => void) => (
+                    <Suspense fallback={null}>
+                        <ProjectsNav enableProjects={enableProjects} enableDesk={enableDesk} onNavigate={onNavigate} />
+                    </Suspense>
+                ),
+                children: [
+                    ...(enableProjects ? [{ path: '/projects', label: t('layout.projects'), match: (p: string) => p === '/projects' || p.startsWith('/projects/') }] : []),
+                    ...(enableDesk ? [{ path: '/desk', label: t('layout.workingFolders'), match: (p: string) => p.startsWith('/desk') }] : []),
+                ],
+            }] as ActivityItem[] : []),
             // ── Power-ups: what extends an agent beyond plain model routing ──
             // Remote — one rail icon for the whole domain, named after the
             // product pillar (remote control) rather than the implementation
             // ("Bots"). Bot is the front door (every connected bot, every
             // platform, credentials live there); Remote Control and Notify are
             // the purposes mounted onto those bots. New purposes append here
-            // as new rows — the rail icon never grows. Desk (no bot, browser
-            // only) closes the list behind its own divider. See bot-arch.md §10.
+            // as new rows — the rail icon never grows. (Desk, which has no
+            // bot, moved to Projects.) See bot-arch.md §10.
             // (key stays 'bots' — internal id, not user-visible.)
             // Hidden via the Remote switch in the rail's Power-ups menu (same hidden set as
             // Team/Image) — hides the rail item only, bots keep running.
@@ -315,13 +345,6 @@ export function useActivityItems(): ActivityItem[] {
                     { type: 'divider' },
                     { path: '/remote-agent', label: t('layout.remoteControl', { defaultValue: 'Remote Control' }), icon: <IconTerminal sx={{ fontSize: 20 }} />, match: (p) => p.startsWith('/remote-agent') },
                     { path: '/notify', label: t('layout.notify', { defaultValue: 'IM Notify' }), icon: <IconBell sx={{ fontSize: 20 }} /> },
-                    // Desk is remote work WITHOUT a bot (Claude Code driven
-                    // from the browser), so it sits in its own group after
-                    // the bot purposes rather than between them.
-                    ...(enableDesk ? [
-                        { type: 'divider' as const },
-                        { path: '/desk', label: t('layout.desk', { defaultValue: 'Desk' }), icon: <IconCode sx={{ fontSize: 20 }} />, match: (p: string) => p.startsWith('/desk') },
-                    ] : []),
                 ] as NavItem[],
             }] as ActivityItem[] : []),
             ...(promptMenuItems.length > 0 ? [{
@@ -414,5 +437,5 @@ export function useActivityItems(): ActivityItem[] {
         ];
 
         return items;
-    }, [t, promptMenuItems, enableGuardrails, enableMCP, enableBench, enableDesk, profiles, imageProfiles, teams, botSummary, hiddenScenarios, pinnedScenarios, vmodelOff]);
+    }, [t, promptMenuItems, enableGuardrails, enableMCP, enableBench, enableDesk, enableProjects, projectsWaiting, profiles, imageProfiles, teams, botSummary, hiddenScenarios, pinnedScenarios, vmodelOff]);
 }
