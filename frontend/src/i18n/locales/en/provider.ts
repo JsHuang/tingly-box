@@ -245,7 +245,7 @@ export default {
       "count_other": "{{count}} keys",
       "expand": "Show all keys",
       "collapse": "Hide keys",
-      "empty": "No keys in this Team yet. Create one from Team Keys above."
+      "empty": "No keys in this Team yet. Create one for each person you hand the Team to."
     },
     "table": {
       "name": "Name",

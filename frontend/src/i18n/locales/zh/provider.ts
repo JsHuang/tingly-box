@@ -243,7 +243,7 @@ export default {
       "count_other": "{{count}} 个 Key",
       "expand": "展开全部 Key",
       "collapse": "收起 Key",
-      "empty": "该 Team 还没有 Key，可通过上方的 Team 密钥按钮创建。"
+      "empty": "该 Team 还没有 Key，为每位要分发的人创建一个。"
     },
     "table": {
       "name": "名称",

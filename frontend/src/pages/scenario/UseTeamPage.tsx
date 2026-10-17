@@ -7,7 +7,7 @@ import {
     DialogContent, DialogTitle, FormControlLabel, IconButton, Stack, Switch,
     TextField, Tooltip,
 } from '@mui/material';
-import {Delete, Edit, HelpOutline, Info as IconInfo, Key as IconKey} from '@/components/icons';
+import {Delete, Edit, HelpOutline, Info as IconInfo} from '@/components/icons';
 import {useEffect, useState} from 'react';
 import {useTranslation} from 'react-i18next';
 import {useNavigate, useParams} from 'react-router-dom';
@@ -21,7 +21,6 @@ import {useAgentObservation} from '@/pages/scenario/hooks/useAgentObservation';
 import ScenarioPageSkeleton from './components/ScenarioPageSkeleton';
 import { SCENARIO_HEADER_CONTENT_MAX_WIDTH } from './components/ScenarioCardHeader';
 import TemplatePage from './components/TemplatePage.tsx';
-import SharingKeysDialog from './components/SharingKeysDialog.tsx';
 import TeamKeysOverview, {useTeamKeysOverviewExpanded} from './components/TeamKeysOverview';
 import {useSharingKeyActions} from '@/hooks/useSharingKeyActions';
 import {useTeamSharingKeys} from '@/hooks/useTeamSharingKeys';
@@ -49,9 +48,8 @@ const UseTeamPageContent: React.FC = () => {
     const access = useAccessExpanded(scenario, !observation.data?.lastRequestAt);
     const [requestsOpen, setRequestsOpen] = useState(false);
     const [logOpen, setLogOpen] = useState(false);
-    const [sharingKeysOpen, setSharingKeysOpen] = useState(false);
-    // One key list and one set of key actions for both the overview under the
-    // header and the Team Keys dialog, so an edit in the dialog shows in both.
+    // The Team's keys and the actions on them (create / enable / move / delete),
+    // all worked from the key card under the header.
     const teamKeys = useTeamSharingKeys(currentTeam?.id);
     const keyActions = useSharingKeyActions({teams, onChanged: teamKeys.reload});
     const keysOverview = useTeamKeysOverviewExpanded();
@@ -137,8 +135,8 @@ const UseTeamPageContent: React.FC = () => {
                 <Stack spacing={2}>
                     <PageHeader
                         // Same shape as the Agent pages: the name carries its edit / delete,
-                        // the switch and looks-in lead, the key action (Sharing Keys) is
-                        // filled and rightmost; status text wraps under the title.
+                        // the switch and looks-in sit on the right; status text wraps under
+                        // the title. The Team's keys are managed in the card right below.
                         title={(
                             <Box sx={{display: 'flex', alignItems: 'center', gap: 1, minWidth: 0}}>
                                 <Box component="span" sx={{minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis'}}>
@@ -229,10 +227,6 @@ const UseTeamPageContent: React.FC = () => {
                                     onOpenLog={() => setLogOpen(true)}
                                     onOpenUsage={() => navigate(`/dashboard/today?scenario=${encodeURIComponent(scenario)}`)}
                                 />
-                                <Button variant="contained" size="small" startIcon={<IconKey sx={{fontSize: 18}} />}
-                                        onClick={() => setSharingKeysOpen(true)}>
-                                    {t('scenarioPage.sharingKeys')}
-                                </Button>
                             </>
                         )}
                         sx={{
@@ -246,15 +240,15 @@ const UseTeamPageContent: React.FC = () => {
                             '& > :last-child': {flexWrap: {lg: 'nowrap'}, flexShrink: {lg: 0}},
                         }}
                     />
-                    {/* Part of the header: the Team's keys stay in view for handing out. */}
+                    {/* Part of the header: the Team's keys stay in view for handing out, and are managed here. */}
                     <TeamKeysOverview
+                        team={currentTeam}
                         keys={teamKeys.keys}
                         loading={teamKeys.loading}
                         expanded={keysOverview.expanded}
                         onToggle={keysOverview.toggle}
-                        visibleTokens={keyActions.tableProps.visibleTokens}
-                        onToggleVisibility={keyActions.tableProps.onToggleVisibility}
-                        onCopy={keyActions.tableProps.onCopy}
+                        actions={keyActions.tableProps}
+                        onCreate={() => keyActions.openCreate(currentTeam)}
                     />
                     {!currentTeam.enabled && <Alert severity="warning">{t('teams.disabledHint')}</Alert>}
                     {/* Folds to one Base URL line, like the Agent pages; open until the first request. */}
@@ -282,12 +276,6 @@ const UseTeamPageContent: React.FC = () => {
                 </Stack>
             )}
 
-            {currentTeam && (
-                <SharingKeysDialog open={sharingKeysOpen} onClose={() => setSharingKeysOpen(false)}
-                                   team={currentTeam} keys={teamKeys.keys} loading={teamKeys.loading}
-                                   tableProps={keyActions.tableProps}
-                                   onCreate={() => keyActions.openCreate(currentTeam)} />
-            )}
             {keyActions.dialogs}
 
             <ScenarioLogDialog open={logOpen} onClose={() => setLogOpen(false)} scenario={scenario} title={t('agentStatus.log')} />
