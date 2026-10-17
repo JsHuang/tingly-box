@@ -260,8 +260,11 @@ const UseTeamPageContent: React.FC = () => {
                     {/* Folds to one Base URL line, like the Agent pages; open until the first request. */}
                     <AgentAccessSection expanded={access.expanded} onToggle={access.toggle} url={`${baseUrl}/tingly/team`}>
                         <Box sx={{maxWidth: SCENARIO_HEADER_CONTENT_MAX_WIDTH}}>
+                            {/* No API Key row: that is this instance's own key; Team members
+                                connect with their Team Key (listed above), never this one. */}
                             <ProviderConfigCard title={t('teams.accessTitle')} baseUrlPath="/tingly/team" baseUrl={baseUrl}
-                                                onCopy={copyToClipboard} compact scenario={scenario} showPlugins={false} />
+                                                onCopy={copyToClipboard} compact scenario={scenario} showPlugins={false}
+                                                showApiKeyRow={false} />
                         </Box>
                     </AgentAccessSection>
 
