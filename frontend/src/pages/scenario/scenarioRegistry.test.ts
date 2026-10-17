@@ -11,10 +11,10 @@ const { SCENARIOS, getHiddenScenarios, useHiddenScenarios } = await import('./sc
 describe('hidden scenarios', () => {
     beforeEach(() => localStorage.clear());
 
-    it('shows every agent when nothing is stored', () => {
-        expect(getHiddenScenarios().size).toBe(0);
+    it('shows every agent but cursor when nothing is stored', () => {
+        expect([...getHiddenScenarios()]).toEqual(['cursor']);
         const { result } = renderHook(() => useHiddenScenarios());
-        expect(SCENARIOS.some((s) => result.current.isHidden(s.id))).toBe(false);
+        expect(SCENARIOS.filter((s) => s.id !== 'cursor').some((s) => result.current.isHidden(s.id))).toBe(false);
     });
 
     it('persists a hidden agent across remounts and leaves the rest visible', () => {
@@ -24,12 +24,11 @@ describe('hidden scenarios', () => {
 
         const { result } = renderHook(() => useHiddenScenarios());
         expect(result.current.isHidden('codex')).toBe(true);
-        expect(SCENARIOS.filter((s) => s.id !== 'codex').some((s) => result.current.isHidden(s.id))).toBe(false);
+        expect(SCENARIOS.filter((s) => s.id !== 'codex' && s.id !== 'cursor').some((s) => result.current.isHidden(s.id))).toBe(false);
     });
 
-    it('persists re-showing an agent', () => {
+    it('persists showing a default-hidden agent', () => {
         const first = renderHook(() => useHiddenScenarios());
-        act(() => first.result.current.toggleHidden('cursor'));
         act(() => first.result.current.toggleHidden('cursor'));
         first.unmount();
 
