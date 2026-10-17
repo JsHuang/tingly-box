@@ -22,6 +22,9 @@ import ScenarioPageSkeleton from './components/ScenarioPageSkeleton';
 import { SCENARIO_HEADER_CONTENT_MAX_WIDTH } from './components/ScenarioCardHeader';
 import TemplatePage from './components/TemplatePage.tsx';
 import SharingKeysDialog from './components/SharingKeysDialog.tsx';
+import TeamKeysOverview, {useTeamKeysOverviewExpanded} from './components/TeamKeysOverview';
+import {useSharingKeyActions} from '@/hooks/useSharingKeyActions';
+import {useTeamSharingKeys} from '@/hooks/useTeamSharingKeys';
 import TeamGuideDialog from '@/components/TeamGuideDialog';
 import {useScenarioPageInternal} from '@/pages/scenario/hooks/useScenarioPageInternal.ts';
 import {ScenarioPageModalProvider} from '@/pages/scenario/context/ScenarioPageContext';
@@ -47,6 +50,11 @@ const UseTeamPageContent: React.FC = () => {
     const [requestsOpen, setRequestsOpen] = useState(false);
     const [logOpen, setLogOpen] = useState(false);
     const [sharingKeysOpen, setSharingKeysOpen] = useState(false);
+    // One key list and one set of key actions for both the overview under the
+    // header and the Team Keys dialog, so an edit in the dialog shows in both.
+    const teamKeys = useTeamSharingKeys(currentTeam?.id);
+    const keyActions = useSharingKeyActions({teams, onChanged: teamKeys.reload});
+    const keysOverview = useTeamKeysOverviewExpanded();
     const [teamGuideOpen, setTeamGuideOpen] = useState(false);
     const [editorOpen, setEditorOpen] = useState(false);
     const [deleteOpen, setDeleteOpen] = useState(false);
@@ -238,6 +246,16 @@ const UseTeamPageContent: React.FC = () => {
                             '& > :last-child': {flexWrap: {lg: 'nowrap'}, flexShrink: {lg: 0}},
                         }}
                     />
+                    {/* Part of the header: the Team's keys stay in view for handing out. */}
+                    <TeamKeysOverview
+                        keys={teamKeys.keys}
+                        loading={teamKeys.loading}
+                        expanded={keysOverview.expanded}
+                        onToggle={keysOverview.toggle}
+                        visibleTokens={keyActions.tableProps.visibleTokens}
+                        onToggleVisibility={keyActions.tableProps.onToggleVisibility}
+                        onCopy={keyActions.tableProps.onCopy}
+                    />
                     {!currentTeam.enabled && <Alert severity="warning">{t('teams.disabledHint')}</Alert>}
                     {/* Folds to one Base URL line, like the Agent pages; open until the first request. */}
                     <AgentAccessSection expanded={access.expanded} onToggle={access.toggle} url={`${baseUrl}/tingly/team`}>
@@ -263,8 +281,11 @@ const UseTeamPageContent: React.FC = () => {
 
             {currentTeam && (
                 <SharingKeysDialog open={sharingKeysOpen} onClose={() => setSharingKeysOpen(false)}
-                                   team={currentTeam} teams={teams} />
+                                   team={currentTeam} keys={teamKeys.keys} loading={teamKeys.loading}
+                                   tableProps={keyActions.tableProps}
+                                   onCreate={() => keyActions.openCreate(currentTeam)} />
             )}
+            {keyActions.dialogs}
 
             <ScenarioLogDialog open={logOpen} onClose={() => setLogOpen(false)} scenario={scenario} title={t('agentStatus.log')} />
             <AgentActivityDialog scenario={scenario} open={requestsOpen} onClose={() => setRequestsOpen(false)} />
