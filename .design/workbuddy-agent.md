@@ -45,6 +45,22 @@ but Cursor (`scenarioRegistry.tsx` `DEFAULT_HIDDEN`).
   - **No release note or doc announcing a move/rename of the file was found.**
     The two directories most likely differ by product (CodeBuddy vs the WorkBuddy
     desktop app) rather than by version, but that is inference, not confirmation.
+  - **Re-checked 2026-10-18.** Tencent Cloud's WorkBuddy model page
+    (cloud.tencent.com/document/product/1831/134445) says the settings UI saves to
+    "本地 workbuddy/models.json" and, separately, that models "已通过
+    ~/.codebuddy/models.json 配置的自定义模型在界面升级后仍可正常使用" — so the
+    desktop app has its own UI-managed file and *also* reads the legacy
+    `~/.codebuddy` one. workbuddy.ai's Model page says the same in English.
+    Consequences: writing `~/.codebuddy` stays the documented route; an id that
+    the user added through the UI (the other file) is not seen by our
+    collision check; hot reload is documented for the CLI only, so the UI copy
+    tells the user to reopen WorkBuddy rather than promising a reload.
+    DeepSeek's official WorkBuddy guide uses `C:\Users\<user>\.codebuddy\models.json`
+    on Windows and warns that a UTF-8 BOM breaks loading, so Auto Config reads a
+    BOM-prefixed file and writes without one.
+  - **All ids taken → refuse.** When every rule's id already belongs to a user
+    model, Auto Config writes nothing (no backup, stale managed entries kept)
+    and says so, instead of reporting success for a file that gained nothing.
   - **Decision (2026-10-12): Auto Config writes `~/.codebuddy/models.json`** — the
     only officially documented target — and keeps the UI steps as the manual
     fallback (they work whichever file the desktop app reads). It does **not** write
@@ -71,6 +87,10 @@ but Cursor (`scenarioRegistry.tsx` `DEFAULT_HIDDEN`).
 - **Unverified end to end:** SSE/tool-call behaviour against the routed models.
 
 ## Sources
+
+- https://cloud.tencent.com/document/product/1831/134445
+- https://www.workbuddy.ai/docs/workbuddy/From-Beginner-to-Expert-Guide/Function-Description/Model
+- https://api-docs.deepseek.com/zh-cn/quick_start/agent_integrations/workbuddy
 
 - https://cloud.tencent.com.cn/document/product/1831/137010
 - https://www.workbuddy.ai/docs/cli/models

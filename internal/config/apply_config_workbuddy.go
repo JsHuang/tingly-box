@@ -1,6 +1,7 @@
 package config
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -183,30 +184,41 @@ func applyWorkBuddyConfigAt(targetPath, baseURL, apiKey string, models []string)
 
 	existing := map[string]interface{}{}
 	mode := os.FileMode(0o600)
-	if info, err := os.Stat(targetPath); err == nil {
+	info, statErr := os.Stat(targetPath)
+	if statErr == nil {
 		data, err := os.ReadFile(targetPath)
 		if err != nil {
 			return fail("Failed to read existing file: %v", err)
 		}
+		data = trimUTF8BOM(data)
 		if len(strings.TrimSpace(string(data))) > 0 {
 			if err := json.Unmarshal(data, &existing); err != nil {
 				return fail("%s is not a JSON object (%v); left untouched", WorkBuddyModelsRelPath, err)
 			}
 		}
+		mode = info.Mode().Perm()
+	} else if !os.IsNotExist(statErr) {
+		return fail("Failed to stat %s: %v", targetPath, statErr)
+	}
+
+	result.Skipped = mergeWorkBuddyModels(existing, BuildWorkBuddyModelEntries(baseURL, apiKey, models))
+	// Every id is taken by one of the user's own models: writing would only
+	// drop our stale entries and add nothing, so refuse before touching the file.
+	if len(models) > 0 && len(result.Skipped) == len(models) {
+		return fail("Nothing written: %s already has models with ids %s; rename the rule's request model or that model's id",
+			WorkBuddyModelsRelPath, strings.Join(result.Skipped, ", "))
+	}
+
+	if statErr == nil {
 		backupPath, err := backupFile(targetPath)
 		if err != nil {
 			return fail("Failed to create backup: %v", err)
 		}
 		result.BackupPath = backupPath
 		result.Updated = true
-		mode = info.Mode().Perm()
-	} else if os.IsNotExist(err) {
-		result.Created = true
 	} else {
-		return fail("Failed to stat %s: %v", targetPath, err)
+		result.Created = true
 	}
-
-	result.Skipped = mergeWorkBuddyModels(existing, BuildWorkBuddyModelEntries(baseURL, apiKey, models))
 
 	output, err := json.MarshalIndent(existing, "", "  ")
 	if err != nil {
@@ -232,6 +244,12 @@ func applyWorkBuddyConfigAt(targetPath, baseURL, apiKey string, models []string)
 		result.Message += fmt.Sprintf("; skipped %s (id already used by another model)", strings.Join(result.Skipped, ", "))
 	}
 	return result
+}
+
+// trimUTF8BOM drops a leading UTF-8 byte-order mark. Hand-edited models.json
+// files often carry one (Windows editors), and encoding/json rejects it.
+func trimUTF8BOM(data []byte) []byte {
+	return bytes.TrimPrefix(data, []byte("\xef\xbb\xbf"))
 }
 
 // writeFileAtomic writes via a temp file in the same directory and renames, so
@@ -302,7 +320,7 @@ func readWorkBuddyAppliedStateAt(path string) WorkBuddyAppliedState {
 		return WorkBuddyAppliedState{}
 	}
 	cfg := map[string]interface{}{}
-	if json.Unmarshal(data, &cfg) != nil {
+	if json.Unmarshal(trimUTF8BOM(data), &cfg) != nil {
 		return WorkBuddyAppliedState{}
 	}
 	state := WorkBuddyAppliedState{Models: []string{}}

@@ -129,3 +129,28 @@ func TestWorkBuddyStatus(t *testing.T) {
 	require.Len(t, diffs, 1)
 	assert.Equal(t, "models", diffs[0].Key)
 }
+
+func TestApplyWorkBuddyConfig_RefusesWhenEveryIDIsTaken(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "models.json")
+	orig := `{"models":[{"id":"gpt-x","url":"https://api.example.com/v1/chat/completions"},{"id":"old","url":"http://h/tingly/workbuddy/v1/chat/completions"}]}`
+	require.NoError(t, os.WriteFile(path, []byte(orig), 0o600))
+
+	res := applyWorkBuddyConfigAt(path, wbBase, "tok", []string{"gpt-x"})
+	assert.False(t, res.Success)
+	assert.Contains(t, res.Message, "gpt-x")
+	data, err := os.ReadFile(path)
+	require.NoError(t, err)
+	assert.Equal(t, orig, string(data), "nothing written, stale managed entry kept")
+	assert.Empty(t, res.BackupPath)
+}
+
+func TestApplyWorkBuddyConfig_AcceptsUTF8BOM(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "models.json")
+	require.NoError(t, os.WriteFile(path, []byte("\xef\xbb\xbf"+`{"models":[{"id":"mine","url":"https://api.example.com/v1/chat/completions"}]}`), 0o600))
+
+	res := applyWorkBuddyConfigAt(path, wbBase, "tok", []string{"m"})
+	require.True(t, res.Success, res.Message)
+	cfg := wbReadJSON(t, path)
+	require.Len(t, cfg["models"].([]interface{}), 2)
+	assert.True(t, readWorkBuddyAppliedStateAt(path).Managed)
+}
