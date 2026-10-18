@@ -3,6 +3,8 @@
   Fill in the sections below. The HTML comments are guidance, not output —
   delete each comment as you fill in (or leave for the reviewer) its section.
   Adapt headings/order to the change; never emit an empty or irrelevant section.
+  No header: the description starts at `## Summary`. Nothing goes above it —
+  no attribution line, badge, banner or hidden marker.
 -->
 
 <!--
@@ -57,5 +59,10 @@ fact, one place — nothing repeats across title/Summary/bullets/Notes.
 -->
 
 <!--
-No footer details from agent except session link
+Footer — the only place for anything that is not about the change itself:
+requester, thread / session links, tracking ids, hidden markers. Keep it plain:
+a `---` rule, then one short line, e.g.
+  _Requested by name · [thread](…) · [session](…)_
+A hidden HTML-comment marker, if a tool needs one, sits on its own line here.
+No badges, banners, "Generated with" lines or model names.
 -->

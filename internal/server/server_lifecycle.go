@@ -292,9 +292,12 @@ func (s *Server) Stop(ctx context.Context) error {
 		log.Println("ImBot settings handler stopped")
 	}
 
-	if s.desk != nil {
-		s.desk.Shutdown(ctx)
-		log.Println("Desk sessions stopped")
+	if s.projects != nil {
+		if err := s.projects.Close(); err != nil {
+			log.Printf("Projects close: %v", err)
+		} else {
+			log.Println("Projects threads stopped")
+		}
 	}
 
 	// Stop token refresher

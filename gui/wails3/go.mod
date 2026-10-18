@@ -1,6 +1,6 @@
 module github.com/tingly-dev/tingly-box/gui/wails3
 
-go 1.26
+go 1.26.0
 
 replace github.com/openai/openai-go/v3 => ./../../libs/openai-go
 
@@ -19,6 +19,8 @@ replace github.com/tingly-dev/tingly-box/agentboot => ../../agentboot
 replace github.com/tingly-dev/tingly-box/swagger => ../../swagger
 
 replace github.com/tingly-dev/tingly-box/afk => ../../afk
+
+replace github.com/tingly-dev/tingly-box/projects => ../../projects
 
 require (
 	github.com/alecthomas/kong v1.15.0
@@ -39,10 +41,10 @@ require (
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
-	golang.org/x/crypto v0.55.0 // indirect
-	golang.org/x/net v0.58.0 // indirect
-	golang.org/x/sys v0.47.0 // indirect
-	golang.org/x/text v0.41.0 // indirect
+	golang.org/x/crypto v0.57.0 // indirect
+	golang.org/x/net v0.60.0 // indirect
+	golang.org/x/sys v0.48.0 // indirect
+	golang.org/x/text v0.42.0 // indirect
 )
 
 require (
@@ -168,6 +170,7 @@ require (
 	github.com/tingly-dev/tingly-box/agentboot v0.0.0-00010101000000-000000000000 // indirect
 	github.com/tingly-dev/tingly-box/ai v0.0.0-00010101000000-000000000000 // indirect
 	github.com/tingly-dev/tingly-box/imbot v0.1.0 // indirect
+	github.com/tingly-dev/tingly-box/projects v0.0.0-00010101000000-000000000000 // indirect
 	github.com/tingly-dev/tingly-box/swagger v0.0.0-20260706041525-46cbb39cc7ff // indirect
 	github.com/tingly-dev/weixin v0.4.10 // indirect
 	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect
@@ -194,8 +197,8 @@ require (
 	go.yaml.in/yaml/v4 v4.0.0-rc.2 // indirect
 	golang.org/x/arch v0.25.0 // indirect
 	golang.org/x/oauth2 v0.36.0 // indirect
-	golang.org/x/sync v0.22.0 // indirect
-	golang.org/x/term v0.45.0 // indirect
+	golang.org/x/sync v0.23.0 // indirect
+	golang.org/x/term v0.46.0 // indirect
 	golang.org/x/time v0.14.0 // indirect
 	google.golang.org/api v0.267.0 // indirect
 	google.golang.org/genai v1.63.0 // indirect

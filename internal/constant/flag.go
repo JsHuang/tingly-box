@@ -36,7 +36,7 @@ const (
 	ExtensionSkillUser          = "skill_user"
 	ExtensionSkillIDE           = "skill_ide"
 	ExtensionBench              = "bench"
-	ExtensionDesk               = "desk"
+	ExtensionProjects           = "projects"
 )
 
 // KnownExtensionBoolFlags is the single source of truth for which
@@ -67,5 +67,5 @@ var KnownExtensionBoolFlags = map[string]bool{
 	ExtensionSkillUser:  true,
 	ExtensionSkillIDE:   true,
 	ExtensionBench:      true,
-	ExtensionDesk:       true,
+	ExtensionProjects:   true,
 }

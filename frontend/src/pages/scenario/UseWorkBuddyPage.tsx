@@ -82,8 +82,8 @@ const WorkBuddySetupDialog: React.FC<{ slot: AgentPageSlot }> = ({ slot }) => {
 
 // WorkBuddy is wired through its "custom model" setting (an OpenAI-compatible
 // endpoint + key), not through a WorkBuddy account login — see
-// .design/workbuddy-oauth.md for why there is no OAuth here. Auto Config merges
-// into ~/.codebuddy/models.json, the file Tencent documents.
+// .design/workbuddy-agent.md. Auto Config merges into ~/.codebuddy/models.json,
+// the file Tencent documents.
 const workbuddy: AgentPageDescriptor = {
     scenario: 'workbuddy',
     title: 'WorkBuddy',

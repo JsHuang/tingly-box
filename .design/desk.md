@@ -1,5 +1,11 @@
 # Desk (MVP)
 
+> 已退役。Desk 已并入 Projects，成为它的工作目录（见
+> [projects-desk-absorption.md](./projects-desk-absorption.md)）：`internal/desk`、
+> `module/desk`、Desk 前端、`/desk` 路由和 `desk` 开关都已删除，旧会话不迁移。
+> §3.1–3.9 讲的是 agentboot 会话引擎的行为（常驻进程、后台任务、子代理、交接），
+> Projects 的线程和工作目录会话仍然按这些规则运行；其余各节只作历史记录。
+
 > Audience: contributors touching the web-based Desk surface, or
 > `remote/session`, `agentboot`, or `remote/control.Core`. Records why this
 > is a thin front door onto machinery @cc already exercises, not a new
@@ -100,19 +106,35 @@ type Message struct {
 ```
 
 `Kind == ""` is still a plain chat message — every line `@cc` has already
-written to disk decodes unchanged. `internal/desk/convert.go`
+written to disk decodes unchanged. `agentboot/engine`'s `convert.go`
 (agentboot Claude messages → transcript entries) and `prompter.go`
 (approval/ask round trip) are the only writers of the new `Kind` values.
 
 ## 3. What `internal/desk.Service` actually does
 
-One package, no sub-packages, built directly on the pieces above:
+Desk is two layers. `agentboot/engine` drives the turns: it runs them
+(resident or one-shot), converts what the CLI emits, holds approvals,
+tracks background tasks, and writes everything through a small `Store`
+interface (append an entry, record a status). It owns no storage and knows
+nothing of profiles or the gateway. `internal/desk` is the host: it keeps
+the sessions in `remote/session` (a `deskStore` adapter is the engine's
+`Store`), resolves each turn's routing in the engine's `Launch` callback,
+and owns everything about profiles, models, folders, status and handoff.
+The split exists so another host can drive Claude Code the same way
+(Projects' threads, tingly-project `.design/projects.md` §4.4). Such a host
+can also answer approvals with its own `Prompter` (Projects keeps them in
+the thread, without a timeout, with per-thread "allow this tool"), learn
+how each turn ended through `OnTurnEnd` (to report it and send the next
+queued message), and test against `engine/enginetest`, a scripted stand-in
+for the CLI; the file
+names below in `turn.go`, `convert.go`, `prompter.go`, `resident.go` and
+`tasks.go` are the engine's.
 
 | concern | how |
 |---|---|
 | pick a folder | `RecentFolders` derives a live list from past web sessions (no separate CRUD store — "recent" just means "used", and nothing here ever scans the filesystem: every path shown is one a session already started in) |
 | start a session | `CreateSession` → `session.Manager.CreateWith` + `startTurn`, which runs the turn in a goroutine (persistent if possible, see §3.1) |
-| drive a turn | `turn.go`'s `runTurn`: converts agentboot events to transcript messages (`convert.go`), routes approvals through a per-turn `webPrompter` (`prompter.go`) that appends the question to the transcript and blocks for `Respond` |
+| drive a turn | the engine's `runTurn` (`turn.go`): converts agentboot events to transcript messages (`convert.go`), routes approvals through a per-turn `webPrompter` (`prompter.go`) that appends the question to the transcript and blocks for `Respond` |
 | steer | `SendMessage` (next turn, `Resume: true`), `Respond` (answer a pending approval/ask), `Interrupt` (cancel the turn's context; the session is left `Completed`+resumable, not `Failed`), `SetPermissionMode` (next turn's `--permission-mode`) |
 | end | `Archive` closes the session for good and closes its resident process, if any — **nothing on disk is touched**: no clone, no directory the tool created, so there is nothing to delete. Archiving only stops tingly-box from resuming that session id |
 
@@ -443,12 +465,19 @@ of tool:
   directory-browsing endpoint (§6).
 - **Session** (`SessionView` + `Transcript`): a title bar (first prompt,
   folder chip with the full path on hover, archive), one centered
-  conversation column, and the composer pinned below it. `buildTranscript`
-  (`deskUtils.ts`) collapses each run of thinking and tool calls into one
-  "Used N tools" row, pairing every call with its result by `request_id`,
-  and attaches an approval's or question's answer to it, so the replies stay
-  the visual anchor (ux-principles.md §9). Only the one request still waiting
-  on a live turn is actionable (§11); an answered one collapses to a line.
+  conversation column, and the composer pinned below it. The transcript is
+  shared with Projects' thread page: `@tingly/projects/transcript`
+  (`frontend/packages/projects/src/transcript`; Desk hands it its drafts and
+  `CodeBlock` through `transcriptHost.tsx`). `buildTranscript` (`model.ts`)
+  pairs every call with its result by `request_id` and attaches an
+  approval's or question's answer to it. Each tool call is one quiet line
+  (name + `toolSummary`) that opens to its input and output; a run of
+  thinking folds into one "Thought" line, so the replies stay the visual
+  anchor (ux-principles.md §9). Only the one request still waiting on a live
+  turn is actionable (§11), and its card shows what it is for (the command,
+  file or URL; the raw input behind "Details"). A settled approval right
+  after its call becomes an Allowed / Denied tag on that call's line; any
+  other answered request collapses to a line.
   Replies render as Markdown through `@ant-design/x-markdown` (already used
   by the Skills page) with `escapeRawHtml` on, so HTML in a model's output is
   shown as text, never rendered; fenced code goes through `CodeBlock`.
@@ -522,7 +551,7 @@ page can be previewed and screenshotted without a backend.
 - Desk's conversation, task and setup strings are defined in English, Chinese
   and Russian, including plural tool counts and the feature-enabling notice.
 
-- **Trajectory** (`Trajectory.tsx`, `trajectoryRows.ts`): a second view of the
+- **Trajectory** (`Trajectory.tsx`, `trajectoryRows.ts`, also in `@tingly/projects/transcript`): a second view of the
   same transcript, for reviewing what the agent did rather than reading
   what it said (modeled on DeepSeek Harness's Trajectory tab). It adds no
   data and no API: `trajectoryRows` projects the `buildTranscript` blocks to
@@ -544,9 +573,9 @@ exercise actual React state and deferred read/send promises, alongside the
 existing transcript and attention unit tests. Real Claude Code/gateway execution
 still needs a configured local installation to validate end to end.
 
-Nav: one row ("Desk") alongside "Remote Control" and "IM Notify"
-under the existing "Remote" rail icon in `layout/useActivityItems.tsx` — a
-new purpose on the same product pillar, not a new top-level domain.
+Nav: Desk's working folders are listed in the Projects rail item's sidebar,
+next to real projects (see `projects-panel.md`). It first shipped as a row
+under Remote; it moved because it never used a bot.
 
 ## 6. Deliberately out of scope for this landing
 

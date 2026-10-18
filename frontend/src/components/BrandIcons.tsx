@@ -55,9 +55,12 @@ import SlackSvg from '@/assets/icons/slack.svg?url';
 import TelegramSvg from '@/assets/icons/telegram.svg?url';
 import WeComSvg from '@/assets/icons/wecom.svg?url';
 import WeixinSvg from '@/assets/icons/weixin.svg?url';
-import WorkBuddySvg from '@/assets/icons/workbuddy.svg?url';
 import XcodeSvg from '@/assets/icons/xcode.svg?url';
 import VSCodeSvg from '@/assets/icons/vscode.svg?url';
+// Not in @lobehub/icons yet; taken from @zenmux/icons (MIT, brand artwork
+// belongs to its owners).
+import WorkBuddySvg from '@/assets/icons/workbuddy.svg?url';
+import ZCodeSvg from '@/assets/icons/zcode.svg?url';
 
 interface BrandIconProps {
     size?: number;
@@ -129,6 +132,8 @@ export const DeepSeek = createBrandIcon(DeepSeekSvg, 'DeepSeek', false, true);
 export const Minimax = createBrandIcon(MinimaxSvg, 'Minimax', false, true);
 export const Zhipu = createBrandIcon(ZhipuSvg, 'Zhipu', false, true);
 export const Zai = createBrandIcon(ZaiSvg, 'Z.ai', false, true);
+export const ZCode = createBrandIcon(ZCodeSvg, 'ZCode', false, true);
+export const WorkBuddy = createBrandIcon(WorkBuddySvg, 'WorkBuddy');
 export const XAI = createBrandIcon(XAISvg, 'xAI', false, true);
 export const Mistral = createBrandIcon(MistralSvg, 'Mistral', false, true);
 export const OpenRouter = createBrandIcon(OpenRouterSvg, 'OpenRouter', false, true);
@@ -136,8 +141,6 @@ export const Xcode = createBrandIcon(XcodeSvg, 'Xcode', true);
 export const VSCode = createBrandIcon(VSCodeSvg, 'VS Code', true);
 export const Cursor = createBrandIcon(CursorSvg, 'Cursor', false, true);
 export const Pi = createBrandIcon(PiSvg, 'Pi', false, true);
-// Official WorkBuddy logo (workbuddy.ai). Full colour, so no dark-mode inversion.
-export const WorkBuddy = createBrandIcon(WorkBuddySvg, 'WorkBuddy');
 
 // Tingly-Box's own mark (full colour, so no dark-mode inversion). Marks a
 // provider that is itself another Tingly-Box gateway.

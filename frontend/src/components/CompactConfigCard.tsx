@@ -29,6 +29,11 @@ interface CompactConfigCardProps {
     title?: string;
     /** Optional: available environment modes (defaults to local + docker) */
     environmentModes?: EnvironmentMode[];
+    /** Controlled environment mode (a page that also shows the URL elsewhere); omit to keep it local. */
+    envMode?: EnvironmentMode;
+    onEnvModeChange?: (mode: EnvironmentMode) => void;
+    /** Show the API Key row (default true). Off where clients bring their own key, e.g. Team (Team Keys). */
+    showApiKeyRow?: boolean;
 }
 
 // ============================================================================
@@ -61,11 +66,16 @@ export const CompactConfigCard: React.FC<CompactConfigCardProps> = ({
     apiKeyLabel = 'API Key',
     title,
     environmentModes,
+    envMode: envModeProp,
+    onEnvModeChange,
+    showApiKeyRow = true,
 }) => {
     const { t } = useTranslation();
     // Get modal state from context
     const { token, setShowTokenModal } = useScenarioPageModal();
-    const [envMode, setEnvMode] = useState<EnvironmentMode>('local');
+    const [localEnvMode, setLocalEnvMode] = useState<EnvironmentMode>('local');
+    const envMode = envModeProp ?? localEnvMode;
+    const setEnvMode = onEnvModeChange ?? setLocalEnvMode;
 
     // Build full URL based on environment mode
     const fullUrl = React.useMemo(() => {
@@ -139,7 +149,7 @@ export const CompactConfigCard: React.FC<CompactConfigCardProps> = ({
     // own — the key used to sit behind a "Base URL | API Key" tab switch.
     return (
         <>
-            {tabs.map((tab) => (
+            {tabs.filter((tab) => showApiKeyRow || tab.key !== 'apiKey').map((tab) => (
                 <ConfigRow key={tab.key} tabs={[tab]} activeTab={tab.key} onTabChange={() => {}} />
             ))}
         </>

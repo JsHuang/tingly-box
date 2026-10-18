@@ -18,6 +18,7 @@ For each new feature, use a placeholder function for api (if not support for cur
 
 - use `MUI` for new frontend component.
 - take care of `layout` while add new pages.
+- The theme, icons and page primitives (`PageLayout`, `PageHeader`, `Surface`, `EmptyState`, `DialogHeader`, `ConfirmDialog`, `CopyIconButton`) live in `frontend/packages/ui` (`@tingly/ui`), shared with the embedded Projects pages. Change them there; the old `src/` paths only re-export.
 
 ### Icons
 General UI icons come from `@/components/icons` (Tabler icons adapted to MUI via `tablerMui()`). **Do not import `@mui/icons-material` directly.**
@@ -37,7 +38,17 @@ When changing `.github/workflows/` or `.github/actions/`, read `.github/workflow
 
 # Pull Requests
 
-Follow `.github/PULL_REQUEST_TEMPLATE.md` for PR title and description.
+Follow `.github/PULL_REQUEST_TEMPLATE.md` for PR title and description. The
+description starts at `## Summary` with no header above it. Everything that is
+not about the change (requester, thread / session links, hidden markers) goes in
+a short, plain footer after a `---` rule.
+
+# Projects
+
+`projects/` is Projects (formerly the tingly-project repo): its own Go module in
+`go.work`, with its own `CLAUDE.md` and `.design/`. It never imports the root
+module (`task projects:boundary`); Tingly Box reaches it only through its
+`projects` facade.
 
 # Build
 

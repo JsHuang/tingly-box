@@ -13,9 +13,8 @@ import { useActivityItems } from './useActivityItems.tsx';
 import { SidebarCollapsedProvider, useSidebarCollapsed } from './useSidebarCollapsed';
 import type { ActivityItem, LayoutProps } from './types';
 import { FloatingStatusIndicators } from '../components/FloatingStatusIndicators';
-import { GitHubStarBanner } from './GitHubStarBanner';
 import { syncUiPrefs } from '../services/uiPrefs';
-import { useHiddenScenarios } from '@/pages/scenario/scenarioRegistry';
+import { useHiddenScenarios, usePinnedScenarios } from '@/pages/scenario/scenarioRegistry';
 import { rememberAgentPath } from '@/pages/scenario/lastAgent';
 import { CoachMark } from '@/components/CoachMark';
 import { useOneTimeTip } from '@/hooks/useOneTimeTip';
@@ -68,7 +67,10 @@ const LayoutInner = ({ children }: LayoutProps) => {
     // Layout for auth/context, but the VS Code-like nav would overwhelm its
     // small window and duplicate the hub's own status row.
     const isHubPage = location.pathname === '/hub';
-    const isDeskPage = location.pathname === '/desk';
+    // Projects' pages are work surfaces that lay out their own spacing
+    // (full-height split views), so they get the content area edge to edge,
+    // clear of the mobile menu bar only.
+    const isProjectsPage = location.pathname === '/projects' || location.pathname.startsWith('/projects/');
 
     const isActive = (path: string) => location.pathname === path;
     const isChildActive = (children?: ActivityItem['children']) =>
@@ -104,6 +106,7 @@ const LayoutInner = ({ children }: LayoutProps) => {
     // each with its visibility toggle. It replaced the /agent card page.
     const [editingAgents, setEditingAgents] = useState(false);
     const { toggleHidden } = useHiddenScenarios();
+    const { togglePinned } = usePinnedScenarios();
     const { dismissed: tipDismissed, dismiss: dismissTip } = useOneTimeTip(AGENT_VISIBILITY_TIP_KEY);
     // The header renders in both the desktop nav and the (kept-mounted)
     // mobile drawer; anchor the callout to whichever eye is on screen.
@@ -130,7 +133,8 @@ const LayoutInner = ({ children }: LayoutProps) => {
     // A sidebar is a choice between pages; an activity with a single page
     // (Bench, or Prompt with one of its two flags on) has nothing to choose,
     // so its rail item goes straight to that page with no sidebar.
-    const hasSidebar = sidebarItems.filter(item => item.type !== 'divider').length > 1;
+    const activeSidebar = activityItems.find(item => item.key === activeActivity)?.sidebar;
+    const hasSidebar = !!activeSidebar || sidebarItems.filter(item => item.type !== 'divider').length > 1;
 
     const activeActivityLabel = useMemo(() => {
         const activity = activityItems.find(item => item.key === activeActivity);
@@ -146,7 +150,7 @@ const LayoutInner = ({ children }: LayoutProps) => {
     const [flyoutOpen, setFlyoutOpen] = useState(false);
 
     const handleActivityClick = (item: ActivityItem) => {
-        const hasSidebarItems = (item.children?.filter(child => child.type !== 'divider').length ?? 0) > 1;
+        const hasSidebarItems = !!item.sidebar || (item.children?.filter(child => child.type !== 'divider').length ?? 0) > 1;
         if (!hasSidebarItems) {
             setMobileOpen(false);
         }
@@ -228,11 +232,13 @@ const LayoutInner = ({ children }: LayoutProps) => {
             {hasSidebar && !sidebarCollapsed && (
                 <Sidebar
                     sidebarItems={sidebarItems}
+                    body={activeSidebar}
                     activeActivityLabel={activeActivityLabel}
                     onClose={() => setMobileOpen(false)}
                     headerAction={sidebarHeaderAction}
                     editing={editingAgents}
                     onToggleHidden={toggleHidden}
+                    onTogglePinned={togglePinned}
                 />
             )}
             {hasSidebar && sidebarCollapsed && flyoutOpen && (
@@ -246,11 +252,13 @@ const LayoutInner = ({ children }: LayoutProps) => {
                     <Box sx={{ position: 'absolute', left: '100%', top: 0, bottom: 0, zIndex: Z_INDEX.drawer + 2, boxShadow: 8, bgcolor: 'background.paper' }}>
                         <Sidebar
                             sidebarItems={sidebarItems}
+                            body={activeSidebar}
                             activeActivityLabel={activeActivityLabel}
                             onClose={() => { setFlyoutOpen(false); setMobileOpen(false); }}
                             headerAction={sidebarHeaderAction}
                             editing={editingAgents}
                             onToggleHidden={toggleHidden}
+                    onTogglePinned={togglePinned}
                         />
                     </Box>
                 </ClickAwayListener>
@@ -259,7 +267,7 @@ const LayoutInner = ({ children }: LayoutProps) => {
     );
 
     return (
-        <Box sx={{ display: 'flex', height: isDeskPage ? '100dvh' : '100vh', overflow: 'hidden', position: 'relative', zIndex: Z_INDEX.main }}>
+        <Box sx={{ display: 'flex', height: isProjectsPage ? '100dvh' : '100vh', overflow: 'hidden', position: 'relative', zIndex: Z_INDEX.main }}>
             {visibilityTip}
             {!isHubPage && <FloatingStatusIndicators />}
 
@@ -295,20 +303,12 @@ const LayoutInner = ({ children }: LayoutProps) => {
             {/* Main content */}
             <Box
                 component="main"
-                sx={{ flexGrow: 1, height: isDeskPage ? '100dvh' : '100vh', display: 'flex', flexDirection: 'column', overflowX: 'hidden', position: 'relative', zIndex: 1 }}
+                sx={{ flexGrow: 1, height: isProjectsPage ? '100dvh' : '100vh', display: 'flex', flexDirection: 'column', overflowX: 'hidden', position: 'relative', zIndex: 1 }}
             >
                 {/* The hub panel is full-bleed: no mobile toolbar exists on
                     /hub (nav is hidden above), so mobileContentSx's xs
                     padding-top would just be 72px of dead space. */}
-                <Box sx={isHubPage ? { flex: 1, minHeight: 0, overflow: 'hidden' } : isDeskPage ? {...mobileContentSx, minHeight: 0, overflow: 'hidden', px: {xs: 0.5, md: 3}, pb: {xs: 0.5, md: 3}, pt: {xs: 7.5, md: 3}} : mobileContentSx}>
-                    {/* The closable star request shows on agent pages only
-                        (Team pages, also under /agent/team, belong to the
-                        Team rail item). See GitHubStarBanner. */}
-                    {location.pathname.startsWith('/agent/') && !location.pathname.startsWith('/agent/team') && (
-                        <Box sx={{ mb: 2 }}>
-                            <GitHubStarBanner />
-                        </Box>
-                    )}
+                <Box sx={isHubPage ? { flex: 1, minHeight: 0, overflow: 'hidden' } : isProjectsPage ? { flex: 1, minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column', pt: { xs: 7, md: 0 } } : mobileContentSx}>
                     {children ?? <Outlet />}
                 </Box>
             </Box>

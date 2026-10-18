@@ -191,8 +191,8 @@ export const scenarioLabel = (t: (key: string) => string, scenario: string): str
 const STORAGE_KEY = 'scenario.hiddenScenarios';
 const DEFAULTS_VERSION_KEY = 'scenario.hiddenDefaultsVersion';
 const VISIBILITY_EVENT = 'scenario-visibility-change';
-// "pi" is hidden by default until its integration details are verified —
-// remove once it's ready to launch.
+// Every other agent is visible until the user hides it — a fresh sidebar shows
+// the whole list at a glance.
 // "cursor" is hidden by default because Cursor's "Override OpenAI Base URL"
 // is called from Cursor's own cloud backend (api2.cursor.sh), not from the
 // local Cursor app — a plain http://localhost:<port>/tingly/cursor Base URL
@@ -200,10 +200,10 @@ const VISIBILITY_EVENT = 'scenario-visibility-change';
 // tingly-box is reachable over a public HTTPS URL (real deployment, or a
 // tunnel). See .design/cursor.md. Un-hide once we can detect/guide this
 // better, e.g. warn inline when baseUrl looks like localhost/a private IP.
-const DEFAULT_HIDDEN = ['pi', 'cursor'];
+const DEFAULT_HIDDEN = ['cursor'];
 // Bump this whenever DEFAULT_HIDDEN gains a genuinely new entry, so existing
 // users pick up the new default without losing their own customisations.
-const DEFAULTS_VERSION = 7;
+const DEFAULTS_VERSION = 5;
 
 // Scenario ids renamed in place (old -> new). A user's existing hidden/shown
 // choice for the old id carries over to the new one below, instead of being
@@ -249,10 +249,6 @@ const readHidden = (): string[] => {
             // default-hidden value once so existing installs see the new
             // Team / tN / Add Team structure without manual discovery.
             if (storedVersion < 4) stored = stored.filter((id) => id !== 'team');
-            // "custom" and "workbuddy" became shown-by-default (v7). Drop the old
-            // default-hidden "custom" once; anything the user hides afterwards
-            // is stored explicitly and stays hidden.
-            if (storedVersion < 7) stored = stored.filter((id) => id !== 'custom' && id !== 'workbuddy');
             const renamedTargets = new Set(Object.values(RENAMED_SCENARIO_IDS));
             const genuinelyNewDefaults = DEFAULT_HIDDEN.filter((id) => !renamedTargets.has(id));
             const merged = Array.from(new Set([...stored, ...genuinelyNewDefaults]));
@@ -303,4 +299,46 @@ export const useHiddenScenarios = () => {
     }, []);
 
     return { hidden, isHidden, toggleHidden };
+};
+
+// ── Pinned agents ────────────────────────────────────────────────────────────
+// The user's own order, one rule: pinned agents sit at the top of the Agent
+// sidebar (above Claude Code and its profiles), in the order they were pinned.
+// Synced like the hidden list so every surface agrees.
+const PINNED_KEY = 'scenario.pinnedScenarios';
+const PINNED_EVENT = 'scenario-pinned-change';
+
+const readPinned = (): string[] => {
+    try {
+        const parsed = JSON.parse(localStorage.getItem(PINNED_KEY) ?? '[]');
+        return Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === 'string') : [];
+    } catch {
+        return [];
+    }
+};
+
+export const getPinnedScenarios = (): string[] => readPinned();
+
+export const usePinnedScenarios = () => {
+    const [pinned, setPinned] = useState<string[]>(() => readPinned());
+
+    useEffect(() => {
+        const sync = () => setPinned(readPinned());
+        window.addEventListener(PINNED_EVENT, sync);
+        window.addEventListener('storage', sync);
+        return () => {
+            window.removeEventListener(PINNED_EVENT, sync);
+            window.removeEventListener('storage', sync);
+        };
+    }, []);
+
+    const togglePinned = useCallback((id: string) => {
+        const current = readPinned();
+        const next = current.includes(id) ? current.filter((x) => x !== id) : [...current, id];
+        setSyncedItem(PINNED_KEY, JSON.stringify(next));
+        window.dispatchEvent(new Event(PINNED_EVENT));
+        setPinned(next);
+    }, []);
+
+    return { pinned, togglePinned };
 };

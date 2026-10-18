@@ -1,34 +1,44 @@
-import { beforeEach, describe, expect, it } from 'vitest';
-import { getHiddenScenarios } from './scenarioRegistry';
+import { act, renderHook } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const KEY = 'scenario.hiddenScenarios';
-const VERSION_KEY = 'scenario.hiddenDefaultsVersion';
+// Keep the write local: the real setSyncedItem also mirrors to the server.
+vi.mock('@/services/uiPrefs', () => ({
+    setSyncedItem: (key: string, value: string) => localStorage.setItem(key, value),
+}));
 
-describe('hidden agent defaults', () => {
+const { SCENARIOS, getHiddenScenarios, useHiddenScenarios } = await import('./scenarioRegistry');
+
+describe('hidden scenarios', () => {
     beforeEach(() => localStorage.clear());
 
-    it('shows custom and workbuddy by default, hides pi and cursor', () => {
-        const hidden = getHiddenScenarios();
-        expect(hidden.has('custom')).toBe(false);
-        expect(hidden.has('workbuddy')).toBe(false);
-        expect(hidden.has('pi')).toBe(true);
-        expect(hidden.has('cursor')).toBe(true);
+    it('shows every agent but cursor when nothing is stored', () => {
+        expect([...getHiddenScenarios()]).toEqual(['cursor']);
+        const { result } = renderHook(() => useHiddenScenarios());
+        expect(SCENARIOS.filter((s) => s.id !== 'cursor').some((s) => result.current.isHidden(s.id))).toBe(false);
     });
 
-    it('clears the old default-hidden custom once, keeping other hidden choices', () => {
-        localStorage.setItem(KEY, JSON.stringify(['custom', 'pi', 'cursor', 'xcode']));
-        localStorage.setItem(VERSION_KEY, '5');
-        const hidden = getHiddenScenarios();
-        expect(hidden.has('custom')).toBe(false);
-        expect(hidden.has('xcode')).toBe(true);
-        expect(hidden.has('pi')).toBe(true);
+    it('persists a hidden agent across remounts and leaves the rest visible', () => {
+        const first = renderHook(() => useHiddenScenarios());
+        act(() => first.result.current.toggleHidden('codex'));
+        first.unmount();
+
+        const { result } = renderHook(() => useHiddenScenarios());
+        expect(result.current.isHidden('codex')).toBe(true);
+        expect(SCENARIOS.filter((s) => s.id !== 'codex' && s.id !== 'cursor').some((s) => result.current.isHidden(s.id))).toBe(false);
     });
 
-    it('respects a user hiding custom/workbuddy after the migration', () => {
-        localStorage.setItem(KEY, JSON.stringify(['custom', 'workbuddy']));
-        localStorage.setItem(VERSION_KEY, '7');
-        const hidden = getHiddenScenarios();
-        expect(hidden.has('custom')).toBe(true);
-        expect(hidden.has('workbuddy')).toBe(true);
+    it('persists showing a default-hidden agent', () => {
+        const first = renderHook(() => useHiddenScenarios());
+        act(() => first.result.current.toggleHidden('cursor'));
+        first.unmount();
+
+        expect(getHiddenScenarios().has('cursor')).toBe(false);
+        expect(localStorage.getItem('scenario.hiddenScenarios')).toBe('[]');
+    });
+
+    it('keeps a stored choice over the defaults', () => {
+        localStorage.setItem('scenario.hiddenScenarios', '["pi"]');
+        localStorage.setItem('scenario.hiddenDefaultsVersion', '5');
+        expect([...getHiddenScenarios()]).toEqual(['pi']);
     });
 });

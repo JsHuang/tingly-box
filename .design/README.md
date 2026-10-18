@@ -26,6 +26,7 @@
 | [probe-panel.pencil.md](./probe-panel.pencil.md) | Probe 面板轴、打开状态与 cURL 流程 | [probe.md](./probe.md) |
 | [imbot-output.pencil.md](./imbot-output.pencil.md) | 消息序列及回复归属；历史图与现行降级分开 | [imbot-output.md](./imbot-output.md) |
 | [npm.pencil.md](./npm.pencil.md) | `tb gui` / `tb app` 与 `npx tingly-box-gui` 的启动、取回与缓存流程 | [npm.md](./npm.md) |
+| [projects-desk-absorption.pencil.md](./projects-desk-absorption.pencil.md) | Desk 并入 Projects：前后对比、数据模型、宿主能力与插槽、切换流程、等待信号、文件去向 | [projects-desk-absorption.md](./projects-desk-absorption.md) |
 
 ## 架构与持久化
 
@@ -69,6 +70,8 @@
 | [third-party-credentials.md](./third-party-credentials.md) | Third-Party Cloud Credentials (AWS Bedrock / GCP Vertex / Azure OpenAI) | 设计说明；局部实施状态见正文 |
 | [kimi-config.md](./kimi-config.md) | Kimi Code OAuth & Client Round Trip: Design and Decisions | 设计说明；局部实施状态见正文 |
 | [zcode-oauth.md](./zcode-oauth.md) | ZCode OAuth (GLM Coding Plan) | 设计说明；局部实施状态见正文 |
+| [workbuddy-oauth.md](./workbuddy-oauth.md) | WorkBuddy OAuth、额度 (Tencent WorkBuddy / CodeBuddy) | 已实现；与第三方实测实现对齐，尚未用真实账号验证，见正文 |
+| [workbuddy-agent.md](./workbuddy-agent.md) | WorkBuddy as an agent（自定义模型接入、Auto Config 写 `~/.codebuddy/models.json`） | 已实现；桌面版是否读取该文件尚未实测，见正文 |
 | [deepseek.md](./deepseek.md) | DeepSeek | 设计说明；局部实施状态见正文 |
 | [codex.md](./codex.md) | Codex as a Client | 设计说明；局部实施状态见正文 |
 | [codex-auth.md](./codex-auth.md) | Codex Auth Modes: gateway, direct ChatGPT, and hybrid | 设计说明；局部实施状态见正文 |
@@ -98,7 +101,11 @@
 | [imbot-output.md](./imbot-output.md) | ImBot 输出预估 — Predicted Per-Platform Chat Output, and the Noise Problem | 当前矩阵 + 已标注的修复前推演 |
 | [im-feishu.md](./im-feishu.md) | Feishu/Lark: IM Service Built Directly, Not via the Fat SDK Client | 设计说明；局部实施状态见正文 |
 | [remote-cc-profile.md](./remote-cc-profile.md) | Remote @cc Profile Selection | 设计说明；局部实施状态见正文 |
-| [desk.md](./desk.md) | Desk (MVP) | 设计说明；局部实施状态见正文 |
+| [desk.md](./desk.md) | Desk (MVP)：已并入 Projects；§3 的会话引擎行为仍然适用 | 已退役 |
+| [projects-panel.md](./projects-panel.md) | Projects 面板：项目和工作目录共用一个侧边栏（TEP-2063） | 已实现 |
+| [projects-desk-absorption.md](./projects-desk-absorption.md) | Desk 并入 Projects：工作目录会话、宿主能力与插槽、切换 | 已实施 |
+| [projects-ui.md](./projects-ui.md) | Projects 面板的 UI 对齐：对照 TB 页面和官方 Projects 的审查与分批计划 | 进行中 |
+| [projects.md](./projects.md) | Projects 接入（宿主侧）：`projects/` 模块、Host 适配器、`projects` 开关、导航与命名；契约见 `projects/.design/projects.md` | 设计说明；代码已搬入，接入未开始 |
 | [smart-guide-on-claude-code.md](./smart-guide-on-claude-code.md) | Smart Guide on Claude Code (retiring tingly-agentscope) | 已废弃方案；现行 runtime 见 afk |
 | [smart-guide-react-anthropic-sdk.md](./smart-guide-react-anthropic-sdk.md) | Smart Guide: in-house ReAct loop on the official Anthropic SDK | 已交付的起源记录；现行设计见 afk |
 ## Image 与图形工具
@@ -146,9 +153,11 @@
 | [onboarding-ux.md](./onboarding-ux.md) | Onboarding UX — guidance for first-time users | 设计说明；局部实施状态见正文 |
 | [ui-redesign.md](./ui-redesign.md) | UI 重设计 — 决策、实施状态与后续 | 部分落地；有撤回及后续项 |
 | [agent-page-redesign.md](./agent-page-redesign.md) | Agent 页重设计 — 模板、配置状态与实施边界 | A–D 落地；E 部分撤回；Profile 暂缓 |
+| [ux-review.md](./ux-review.md) | UX 梳理 — 前端"杂乱"的审计、讨论与决定 | 讨论中；Star 入口、Dashboard 头部、Agent 页 v4 已确定并有 PR |
 | [ui-flow-analysis.md](./ui-flow-analysis.md) | UI 动线分析 — 发现、人工打标反馈与实现结论 | 第 1 轮已落地；其余项见正文 |
 | [refactor-frontend-2026-09.md](./refactor-frontend-2026-09.md) | Frontend Refactor 2026-09 — Plan & Survey Reports (merged) | 已完成的历史审计与交付记录 |
 | [icon-hierarchy.md](./icon-hierarchy.md) | Icon Hierarchy | 设计说明；局部实施状态见正文 |
+| [i18n.md](./i18n.md) | 前端 i18n 文案按功能大类分文件 | 现行契约 |
 | [theme.md](./theme.md) | Theme system notes | 设计说明；局部实施状态见正文 |
 | [gui-host-bridge.md](./gui-host-bridge.md) | Host bridge: one frontend for the browser tab and the desktop window | 设计说明；局部实施状态见正文 |
 | [gui-packaging.md](./gui-packaging.md) | Desktop GUI packaging | 设计说明；局部实施状态见正文 |

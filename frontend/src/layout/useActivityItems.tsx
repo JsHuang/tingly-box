@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { Box } from '@mui/material';
 import { useTranslation } from 'react-i18next';
-import { SCENARIOS, getHiddenScenarios } from '@/pages/scenario/scenarioRegistry';
+import { SCENARIOS, getHiddenScenarios, getPinnedScenarios } from '@/pages/scenario/scenarioRegistry';
 import { OpenAI, Anthropic, Claude, Cursor, DeepSeek, OpenCode, Pi, WorkBuddy, Xcode, VSCode, Codex, ClaudeDesktop } from '../components/BrandIcons';
 import {
     SettingsApplications,
@@ -20,7 +20,7 @@ import {
     Settings as IconSettings,
     Send as IconSend,
     License as IconLicense,
-    History as IconHistory,
+    Speed as IconQuota,
     Key as IconKey,
     Shield as IconShield,
     Lock as IconLock,
@@ -37,6 +37,7 @@ import {
     Extension as IconExtension,
     Code as IconCode,
     TestPipe as IconTestPipe,
+    Folder as IconFolder,
     tablerMui,
 } from '@/components/icons';
 import { IconLibraryPhoto as TablerLibraryPhoto } from '@tabler/icons-react';
@@ -47,6 +48,11 @@ import { useTeamContext } from '@/contexts/TeamContext';
 import { orderTeams, teamPath } from '@/utils/team';
 import type { ActivityItem, NavItem, NavItemBase } from './types';
 import { useBotPlatformSummary } from './useBotPlatformSummary';
+import { useProjectsWaiting } from './useProjectsWaiting';
+
+// The Projects sidebar body carries @tingly/projects; lazy so the package stays
+// out of the eager bundle until the Projects item is open.
+const ProjectsNav = lazy(() => import('@/pages/projects/ProjectsNav'));
 
 const IconLibraryPhoto = tablerMui(TablerLibraryPhoto);
 
@@ -57,7 +63,8 @@ const DASHBOARD_RANGE_PATH = /^\/dashboard\/(today|yesterday|3d|7d|30d|90d)$/;
 
 export function useActivityItems(): ActivityItem[] {
     const { t } = useTranslation();
-    const { skillUser, skillIde, enableGuardrails, enableMCP, enableBench, enableDesk } = useFeatureFlags();
+    const { skillUser, skillIde, enableGuardrails, enableMCP, enableBench, enableProjects } = useFeatureFlags();
+    const projectsWaiting = useProjectsWaiting(enableProjects);
     const { profiles } = useProfileContext();
     const imageProfiles = useImageProfiles();
     const { teams } = useTeamContext();
@@ -70,6 +77,16 @@ export function useActivityItems(): ActivityItem[] {
         window.addEventListener('storage', sync);
         return () => {
             window.removeEventListener('scenario-visibility-change', sync);
+            window.removeEventListener('storage', sync);
+        };
+    }, []);
+    const [pinnedScenarios, setPinnedScenarios] = useState<string[]>(() => getPinnedScenarios());
+    useEffect(() => {
+        const sync = () => setPinnedScenarios(getPinnedScenarios());
+        window.addEventListener('scenario-pinned-change', sync);
+        window.addEventListener('storage', sync);
+        return () => {
+            window.removeEventListener('scenario-pinned-change', sync);
             window.removeEventListener('storage', sync);
         };
     }, []);
@@ -156,7 +173,7 @@ export function useActivityItems(): ActivityItem[] {
             return s ? t(s.descKey) : undefined;
         };
         const flagged = (group: HideableScenario[]): NavItem[] =>
-            group.map(s => ({ ...s.nav, hideId: s.id, hidden: hiddenScenarios.has(s.id), hint: hintOf(s.id) }));
+            group.map(s => ({ ...s.nav, hideId: s.id, hidden: hiddenScenarios.has(s.id), hint: hintOf(s.id), pinId: s.id, pinned: pinnedScenarios.includes(s.id) }));
 
         const teamActivityItem: ActivityItem = {
             key: 'team',
@@ -190,6 +207,18 @@ export function useActivityItems(): ActivityItem[] {
         ]);
 
         const scenarioChildren: NavItem[] = [];
+        // Pinned agents lead the list (in pin order), above Claude Code; the
+        // rest keep their groups. Claude Code itself is already first, with its
+        // profiles, so it has no pin.
+        const pinnedRows = pinnedScenarios
+            .map(id => [...codingTools, ...sdkTools].find(n => n.type !== 'divider' && n.pinId === id))
+            .filter((n): n is NavItemBase => !!n);
+        const isPinnedRow = (n: NavItem) => n.type !== 'divider' && !!n.pinned;
+        codingTools.splice(0, codingTools.length, ...codingTools.filter(n => !isPinnedRow(n)));
+        sdkTools.splice(0, sdkTools.length, ...sdkTools.filter(n => !isPinnedRow(n)));
+        if (pinnedRows.length > 0) {
+            scenarioChildren.push(...pinnedRows, { type: 'divider' });
+        }
         const claudeCodeHidden = hiddenScenarios.has('claude_code');
         scenarioChildren.push({
             path: '/agent/claude_code',
@@ -230,7 +259,7 @@ export function useActivityItems(): ActivityItem[] {
                     // on that page (every /dashboard/<range> URL still works).
                     { path: '/dashboard/today', label: t('layout.usage', { defaultValue: 'Usage' }), icon: <IconChartBar sx={{ fontSize: 20 }} />, match: (p) => DASHBOARD_RANGE_PATH.test(p) },
                     { path: '/dashboard/users', label: t('layout.userUsage', { defaultValue: 'Team usage' }), icon: <IconUsers sx={{ fontSize: 20 }} /> },
-                    { path: '/dashboard/quota-history', label: t('layout.quotaHistory', { defaultValue: 'Quota history' }), icon: <IconHistory sx={{ fontSize: 20 }} /> },
+                    { path: '/dashboard/quota-history', label: t('layout.quotaHistory', { defaultValue: 'Quota history' }), icon: <IconQuota sx={{ fontSize: 20 }} /> },
                 ],
             },
             // ── Use: agent ⇄ model, team, image ──
@@ -252,14 +281,11 @@ export function useActivityItems(): ActivityItem[] {
                 icon: <IconPhoto sx={{ fontSize: 22 }} />,
                 label: t('layout.image', { defaultValue: 'Image' }),
                 defaultPath: '/image/playground',
-                // Image API + Library on top, then the same shape as Claude Code's
-                // profiles: the default Playground, one row per profile, "New profile".
+                // The work surface first (the same shape as Claude Code's
+                // profiles: the default Playground, one row per profile, "New
+                // profile"), then what is shared: the Library and, last, the
+                // Image API, which only someone wiring up a client needs.
                 children: [
-                    // Shared surfaces first: the API endpoint and what is kept
-                    // across profiles, then the Playground and its profiles.
-                    { path: '/image/api', label: t('layout.nav.useImageGen', { defaultValue: 'Image API' }), icon: <IconPlug sx={{ fontSize: 20 }} /> },
-                    { path: '/image/library', label: t('imageLibrary.title', { defaultValue: 'Library' }), icon: <IconLibraryPhoto sx={{ fontSize: 20 }} /> },
-                    { type: 'divider' },
                     { path: '/image/playground', label: t('layout.imagePlayground', { defaultValue: 'Playground' }), subtitle: t('layout.default'), icon: <IconPalette sx={{ fontSize: 20 }} /> },
                     ...imageProfiles.map((profile): NavItem => ({
                         path: `/image/profile/${profile.id}`,
@@ -271,6 +297,29 @@ export function useActivityItems(): ActivityItem[] {
                             : <IconPalette sx={{ fontSize: 20 }} />,
                     })),
                     { path: '/image/profile/new', label: t('imageProfile.new', { defaultValue: 'New profile' }), icon: <IconPlus sx={{ fontSize: 20 }} /> },
+                    { type: 'divider' },
+                    { path: '/image/library', label: t('imageLibrary.title', { defaultValue: 'Library' }), icon: <IconLibraryPhoto sx={{ fontSize: 20 }} /> },
+                    { path: '/image/api', label: t('layout.nav.useImageGen', { defaultValue: 'Image API' }), icon: <IconPlug sx={{ fontSize: 20 }} /> },
+                ],
+            }] as ActivityItem[] : []),
+            // Projects — every place Claude Code works from the browser:
+            // projects, where a coordinator runs each task as a thread, and
+            // plain working folders (.design/projects.md). Its sidebar lists
+            // the projects and folders themselves (ProjectsNav), not pages.
+            // The dot says a thread waits on you.
+            ...(enableProjects ? [{
+                key: 'projects',
+                icon: <IconFolder sx={{ fontSize: 22 }} />,
+                label: t('layout.projects'),
+                defaultPath: '/projects',
+                attention: projectsWaiting ? t('layout.projectsWaiting') : undefined,
+                sidebar: (onNavigate: () => void) => (
+                    <Suspense fallback={null}>
+                        <ProjectsNav onNavigate={onNavigate} />
+                    </Suspense>
+                ),
+                children: [
+                    { path: '/projects', label: t('layout.projects'), match: (p: string) => p === '/projects' || p.startsWith('/projects/') },
                 ],
             }] as ActivityItem[] : []),
             // ── Power-ups: what extends an agent beyond plain model routing ──
@@ -279,8 +328,7 @@ export function useActivityItems(): ActivityItem[] {
             // ("Bots"). Bot is the front door (every connected bot, every
             // platform, credentials live there); Remote Control and Notify are
             // the purposes mounted onto those bots. New purposes append here
-            // as new rows — the rail icon never grows. Desk (no bot, browser
-            // only) closes the list behind its own divider. See bot-arch.md §10.
+            // as new rows — the rail icon never grows. See bot-arch.md §10.
             // (key stays 'bots' — internal id, not user-visible.)
             // Hidden via the Remote switch in the rail's Power-ups menu (same hidden set as
             // Team/Image) — hides the rail item only, bots keep running.
@@ -294,13 +342,6 @@ export function useActivityItems(): ActivityItem[] {
                     { type: 'divider' },
                     { path: '/remote-agent', label: t('layout.remoteControl', { defaultValue: 'Remote Control' }), icon: <IconTerminal sx={{ fontSize: 20 }} />, match: (p) => p.startsWith('/remote-agent') },
                     { path: '/notify', label: t('layout.notify', { defaultValue: 'IM Notify' }), icon: <IconBell sx={{ fontSize: 20 }} /> },
-                    // Desk is remote work WITHOUT a bot (Claude Code driven
-                    // from the browser), so it sits in its own group after
-                    // the bot purposes rather than between them.
-                    ...(enableDesk ? [
-                        { type: 'divider' as const },
-                        { path: '/desk', label: t('layout.desk', { defaultValue: 'Desk' }), icon: <IconCode sx={{ fontSize: 20 }} />, match: (p: string) => p.startsWith('/desk') },
-                    ] : []),
                 ] as NavItem[],
             }] as ActivityItem[] : []),
             ...(promptMenuItems.length > 0 ? [{
@@ -330,7 +371,7 @@ export function useActivityItems(): ActivityItem[] {
                     { path: '/guardrails/groups', label: t('layout.policyGroups'), icon: <IconLicense sx={{ fontSize: 20 }} /> },
                     { path: '/guardrails/rules', label: t('layout.policies'), icon: <IconLicense sx={{ fontSize: 20 }} /> },
                     { path: '/guardrails/credentials', label: t('layout.protectedCredentials', { defaultValue: 'Secrets' }), icon: <IconKey sx={{ fontSize: 20 }} /> },
-                    { path: '/guardrails/history', label: t('layout.guardrailsHistory'), icon: <IconHistory sx={{ fontSize: 20 }} /> },
+                    { path: '/guardrails/history', label: t('layout.guardrailsHistory'), icon: <IconQuota sx={{ fontSize: 20 }} /> },
                 ] as NavItem[],
             }] as ActivityItem[] : []),
             // Bench — the customizable end-to-end test workbench
@@ -393,5 +434,5 @@ export function useActivityItems(): ActivityItem[] {
         ];
 
         return items;
-    }, [t, promptMenuItems, enableGuardrails, enableMCP, enableBench, enableDesk, profiles, imageProfiles, teams, botSummary, hiddenScenarios, vmodelOff]);
+    }, [t, promptMenuItems, enableGuardrails, enableMCP, enableBench, enableProjects, projectsWaiting, profiles, imageProfiles, teams, botSummary, hiddenScenarios, pinnedScenarios, vmodelOff]);
 }

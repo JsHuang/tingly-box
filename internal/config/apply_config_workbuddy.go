@@ -19,7 +19,7 @@ import (
 // desktop doc says models "previously configured via ~/.codebuddy/models.json"
 // still work. ~/.workbuddy/models.json appears only in third-party guides.
 // Whether the desktop app reads this exact file is not confirmed on a real
-// install; see .design/workbuddy-oauth.md §9.
+// install; see .design/workbuddy-agent.md.
 
 // WorkBuddyModelsRelPath is the display path of the file this writes.
 const WorkBuddyModelsRelPath = "~/.codebuddy/models.json"
