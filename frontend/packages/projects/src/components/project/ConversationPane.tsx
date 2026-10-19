@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Box, Button, Chip, Collapse, Paper, Typography } from '@mui/material';
+import { useEffect, useRef, useState } from 'react';
+import { Alert, Box, Button, Chip, Collapse, IconButton, Paper, Typography } from '@mui/material';
 import { fontSizes } from '@tingly/ui/theme/fonts';
 import { Link as RouterLink } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -31,6 +31,8 @@ function parse<T>(payload?: string): T | null {
 export function ThreadCard({ thread, onOpen }: { thread: Thread; onOpen: (id: string) => void }) {
     const { t } = useTranslation('projects');
     const [reviewing, setReviewing] = useState(false);
+    const [showReport, setShowReport] = useState(false);
+    const report = (thread.last_report ?? '').trim();
     const canReview = thread.status === 'ready' && !!thread.branch && thread.commits_ahead > 0 && !thread.merged_at;
     return (
         <>
@@ -56,6 +58,16 @@ export function ThreadCard({ thread, onOpen }: { thread: Thread; onOpen: (id: st
                     <ThreadSubtitle thread={thread} />
                 </Typography>
                 <ThreadBadges thread={thread} />
+                {report !== '' && (
+                    <IconButton size="small" aria-expanded={showReport} title={t(showReport ? 'thread.hideReport' : 'thread.showReport')} aria-label={t(showReport ? 'thread.hideReport' : 'thread.showReport')}
+                        sx={{ flexShrink: 0, p: 0.25 }}
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            setShowReport((v) => !v);
+                        }}>
+                        {showReport ? <ExpandMore sx={{ fontSize: 16 }} /> : <ChevronRight sx={{ fontSize: 16 }} />}
+                    </IconButton>
+                )}
                 {canReview && (
                     <Button size="small" variant="outlined" startIcon={<DiffIcon />} sx={{ flexShrink: 0, py: 0.125 }}
                         onClick={(e) => {
@@ -66,80 +78,14 @@ export function ThreadCard({ thread, onOpen }: { thread: Thread; onOpen: (id: st
                     </Button>
                 )}
             </Box>
-            {canReview && <DiffDialog thread={thread} open={reviewing} onClose={() => setReviewing(false)} />}
-        </>
-    );
-}
-
-interface UpdatePayload {
-    thread_id: string;
-    title: string;
-    kind: string;
-    status: string;
-}
-
-/**
- * What threads reported to the coordinator since the last thing said in the
- * conversation, folded into one quiet line. The coordinator needs these
- * reports; the user does not have to read them, so the line carries no badge
- * and opens only on a click, to the report each thread sent.
- */
-export function ThreadUpdatesFold({ updates, onOpen }: { updates: ProjectMessage[]; onOpen: (id: string) => void }) {
-    const { t } = useTranslation('projects');
-    const [open, setOpen] = useState(false);
-    const rows = updates.map((m) => ({ m, p: parse<UpdatePayload>(m.payload) }));
-    const titles = [...new Set(rows.map((r) => r.p?.title).filter((x): x is string => !!x))];
-    const toggle = () => setOpen((v) => !v);
-    return (
-        <Box sx={{ my: 1 }}>
-            <Box
-                role="button"
-                tabIndex={0}
-                aria-expanded={open}
-                onClick={toggle}
-                onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault();
-                        toggle();
-                    }
-                }}
-                sx={{
-                    display: 'flex', alignItems: 'center', gap: 0.75, minWidth: 0, py: 0.25, px: 0.5, mx: -0.5, borderRadius: 1,
-                    cursor: 'default', userSelect: 'none', color: 'text.secondary', fontSize: fontSizes.md, outline: 'none',
-                    '&:hover': { bgcolor: 'action.hover', color: 'text.primary' },
-                    '&:focus-visible': { boxShadow: (th) => `inset 0 0 0 2px ${th.palette.primary.main}` },
-                }}
-            >
-                <Box component="span" sx={{ flexShrink: 0 }}>{t('conversation.updates', { count: updates.length })}</Box>
-                {!open && titles.length > 0 && <Typography noWrap component="span" sx={{ minWidth: 0, fontSize: 'inherit', color: 'text.disabled' }}>{titles.join(' · ')}</Typography>}
-                {open ? <ExpandMore sx={{ fontSize: 16, flexShrink: 0 }} /> : <ChevronRight sx={{ fontSize: 16, flexShrink: 0 }} />}
-            </Box>
-            <Collapse in={open} unmountOnExit>
-                <Box sx={{ mt: 0.5, ml: 0.5, pl: 1.5, borderLeft: 2, borderColor: 'divider', display: 'flex', flexDirection: 'column', gap: 1.25 }}>
-                    {rows.map(({ m, p }) => (
-                        <Box key={m.id} sx={{ minWidth: 0 }}>
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, minWidth: 0 }}>
-                                {p && (
-                                    <Box component="span" title={t(`thread.status.${p.status}`)} sx={{ display: 'inline-flex', flexShrink: 0, color: toneColor(statusColor(p.status)) }}>
-                                        <StatusIcon status={p.status} />
-                                    </Box>
-                                )}
-                                <Typography noWrap
-                                    component={p ? 'button' : 'span'}
-                                    onClick={p ? () => onOpen(p.thread_id) : undefined}
-                                    sx={{ minWidth: 0, p: 0, border: 0, bgcolor: 'transparent', font: 'inherit', fontSize: fontSizes.md, fontWeight: 600, color: 'text.primary', cursor: p ? 'pointer' : 'default', textAlign: 'left', '&:hover': p ? { textDecoration: 'underline' } : undefined }}>
-                                    {p?.title ?? ''}
-                                </Typography>
-                                {p && <Typography component="span" sx={{ flexShrink: 0, fontSize: fontSizes.md, color: 'text.secondary' }}>{t(`conversation.updateKind.${p.kind}`, { defaultValue: p.kind })}</Typography>}
-                            </Box>
-                            {m.content.trim() !== '' && (
-                                <Box sx={{ color: 'text.secondary', fontSize: fontSizes.md, mt: 0.25 }}><Markdown text={m.content} /></Box>
-                            )}
-                        </Box>
-                    ))}
+            {/* What the thread last told the coordinator, open on demand. */}
+            <Collapse in={showReport} unmountOnExit>
+                <Box sx={{ mt: 0.5, ml: 1.25, pl: 1.5, borderLeft: 2, borderColor: 'divider', color: 'text.secondary', fontSize: fontSizes.md }}>
+                    <Markdown text={report} />
                 </Box>
             </Collapse>
-        </Box>
+            {canReview && <DiffDialog thread={thread} open={reviewing} onClose={() => setReviewing(false)} />}
+        </>
     );
 }
 
@@ -215,23 +161,6 @@ export function ConversationPane({ projectId, messages, threads, busy, disabled,
     const scrollRef = useRef<HTMLDivElement>(null);
     const stick = useRef(true);
     const [seed, setSeed] = useState('');
-    // A run of thread reports folds into one line, drawn at the run's first message.
-    const updateRuns = useMemo(() => {
-        const runs = new Map<string, ProjectMessage[]>();
-        let cur: ProjectMessage[] | null = null;
-        for (const m of messages) {
-            if (m.kind !== 'thread_update') {
-                cur = null;
-                continue;
-            }
-            if (!cur) {
-                cur = [];
-                runs.set(m.id, cur);
-            }
-            cur.push(m);
-        }
-        return runs;
-    }, [messages]);
 
     useEffect(() => {
         const el = scrollRef.current;
@@ -294,12 +223,9 @@ export function ConversationPane({ projectId, messages, threads, busy, disabled,
                             }
                             case 'suggestions':
                                 return <SuggestionsCard key={m.id} message={m} threads={threads} onStart={onStartSuggestions} onOpen={onOpenThread} disabled={disabled} />;
-                            // A thread's change shows on its line above; what it reported to
-                            // the coordinator folds into one line, open on demand.
-                            case 'thread_update': {
-                                const run = updateRuns.get(m.id);
-                                return run ? <ThreadUpdatesFold key={m.id} updates={run} onOpen={onOpenThread} /> : null;
-                            }
+                            // A thread's change shows on its line above, not as a note.
+                            case 'thread_update':
+                                return null;
                             case 'error':
                                 return (
                                     <Alert key={m.id} severity="error" sx={{ my: 1.5, '& .MuiAlert-message': { minWidth: 0, wordBreak: 'break-word' } }}
