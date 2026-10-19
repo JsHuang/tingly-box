@@ -368,10 +368,13 @@
 | 两个 `AgentActivityDialog` 合成一个实例 | 会失去关闭时的淡出动画 |
 | 去掉 `wasAllDone` 自动隐藏 | 是行为取舍，不是纯简化 |
 
-## 9. 第 3 轮：落地页跟着常用走
+## 9. 第 3 轮：Dashboard 停靠在 rail 底部
 
-**发现（F15）**：rail 第一项是 Dashboard，落地页却固定是 `/agent`，而且 `OnboardingGate` 每次打开都会清掉上次所在的栏目。打开后亮的是第二个图标。
+**发现（F15）**：落地页是 `/agent`，rail 第一项却是 Dashboard，打开后亮的是第二个图标，"从上往下读"和"我现在在哪"对不上。
 
-**人工打标反馈（2026-10-19）**："默认开 agents，但 dashboard 在第一，这个交互再评审下"。第一版方案把 Agent 挪到第一，被否："dashboard 放最开始是因为常用"。rail 按使用频率排，这一点不改。
+**人工打标反馈（2026-10-19）**："默认开 agents，但 dashboard 在第一，这个交互再评审下"。评审中否掉了两个方案：
+- 把 Agent 挪到第一、Dashboard 排到使用组后面：被否，"dashboard 放最开始是因为常用"。
+- 落地页改为回到上次所在的栏目：没有采用，问题不在落地页。
+- 最终方向（产品负责人提出）："核心问题是 dashboard 在上面，能不能把它移到最下面"。
 
-**结论**：冲突不在顺序，在落地页不看使用。落地页改为回到上次所在的栏目（`layout.activeActivity`，Layout 本来就在存），打开它的默认页：常看 Dashboard 的人打开就是 Dashboard，在 Agent 上工作的人打开就是上次那个 Agent 页。新装没有记录，仍进 `/agent` 的 Quick Start（P6：智能默认而不是开关）；记录的栏目已隐藏或没有 rail 项（Help）时也回到 `/agent`。不选"一律进 Dashboard"，因为新装时图表是空的，还得再引导回 Agent。
+**结论**：Dashboard 从滚动列表里拿出来，停靠在 rail 底部、偏好按钮上方（`ActivityItem.dock: 'bottom'`）。列表第一项就是落地页 Agent；Dashboard 常用，所以停靠区不随列表滚动，任何时候都在视野里、一次点击可达。底部是"看一眼"的位置（同 VS Code 的账户、设置），不和"开始干活"的入口争第一。落地页保持 `/agent` 不变。

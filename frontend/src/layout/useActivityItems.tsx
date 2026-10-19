@@ -244,24 +244,12 @@ export function useActivityItems(): ActivityItem[] {
         pushGroup(codingTools);
         pushGroup(sdkTools);
 
-        // Rail order, top to bottom: usage → use → power-ups → verify →
-        // configuration. Dashboard leads because it is the most used. The
-        // landing follows use too: OnboardingGate reopens the activity the
-        // user was last in, and a new install (nothing saved) opens /agent.
+        // Rail order, top to bottom: use → power-ups → verify →
+        // configuration. Agent leads, matching the landing (OnboardingGate
+        // opens /agent, and Layout falls back to the 'scenario' activity).
+        // Dashboard is used all the time but is not where work starts, so it
+        // is docked at the foot of the rail, always in view and one click away.
         const items: ActivityItem[] = [
-            {
-                key: 'dashboard',
-                icon: <IconChartBar sx={{ fontSize: 22 }} />,
-                label: t('layout.dashboard', { defaultValue: 'Dashboard' }),
-                defaultPath: '/dashboard/today',
-                children: [
-                    // One row for the usage charts; the time range is a filter
-                    // on that page (every /dashboard/<range> URL still works).
-                    { path: '/dashboard/today', label: t('layout.usage', { defaultValue: 'Usage' }), icon: <IconChartBar sx={{ fontSize: 20 }} />, match: (p) => DASHBOARD_RANGE_PATH.test(p) },
-                    { path: '/dashboard/users', label: t('layout.userUsage', { defaultValue: 'Team usage' }), icon: <IconUsers sx={{ fontSize: 20 }} /> },
-                    { path: '/dashboard/quota-history', label: t('layout.quotaHistory', { defaultValue: 'Quota history' }), icon: <IconQuota sx={{ fontSize: 20 }} /> },
-                ],
-            },
             // ── Use: agent ⇄ model, team, image ──
             {
                 key: 'scenario',
@@ -429,6 +417,21 @@ export function useActivityItems(): ActivityItem[] {
                     { path: '/system/experimental', label: t('layout.experimental'), icon: <IconFlask sx={{ fontSize: 20 }} /> },
                     { path: '/system/develop', label: t('layout.develop'), icon: <IconCode sx={{ fontSize: 20 }} /> },
                     { path: '/system/logs', label: t('layout.logs'), icon: <IconFileText sx={{ fontSize: 20 }} /> },
+                ],
+            },
+            // ── Docked at the foot of the rail ──
+            {
+                key: 'dashboard',
+                dock: 'bottom',
+                icon: <IconChartBar sx={{ fontSize: 22 }} />,
+                label: t('layout.dashboard', { defaultValue: 'Dashboard' }),
+                defaultPath: '/dashboard/today',
+                children: [
+                    // One row for the usage charts; the time range is a filter
+                    // on that page (every /dashboard/<range> URL still works).
+                    { path: '/dashboard/today', label: t('layout.usage', { defaultValue: 'Usage' }), icon: <IconChartBar sx={{ fontSize: 20 }} />, match: (p) => DASHBOARD_RANGE_PATH.test(p) },
+                    { path: '/dashboard/users', label: t('layout.userUsage', { defaultValue: 'Team usage' }), icon: <IconUsers sx={{ fontSize: 20 }} /> },
+                    { path: '/dashboard/quota-history', label: t('layout.quotaHistory', { defaultValue: 'Quota history' }), icon: <IconQuota sx={{ fontSize: 20 }} /> },
                 ],
             },
         ];

@@ -64,6 +64,65 @@ export const ActivityBar: React.FC<ActivityBarProps> = ({
         if (el && el.offsetParent !== null) setUserButtonEl(el);
     }, []);
 
+    // One rail icon; the scrolling list and the docked foot share it.
+    const renderItem = (item: ActivityItem) => {
+        const isActiveItem = activeActivity === item.key;
+        // Mirrors Layout.handleActivityClick's own targetPath logic, so the
+        // rendered href always matches where a click would actually navigate —
+        // even for activities that own a level-2 sidebar (item.children).
+        const firstNavChild = item.children?.find((c) => c.type !== 'divider');
+        const targetPath = item.defaultPath || item.path || firstNavChild?.path;
+
+        return (
+            <ListItemButton
+                key={item.key}
+                component={targetPath ? RouterLink : 'div'}
+                to={targetPath}
+                onClick={() => onActivityClick(item)}
+                sx={activityItemSx({
+                    '&:hover': {
+                        bgcolor: isActiveItem ? 'primary.main' : 'action.hover',
+                        color: isActiveItem ? 'primary.contrastText' : 'primary.main',
+                    },
+                    ...(isActiveItem && {
+                        bgcolor: 'primary.main',
+                        color: 'primary.contrastText',
+                    }),
+                })}
+            >
+                <ListItemIcon sx={{ minWidth: 0, color: 'inherit', justifyContent: 'center' }}>
+                    <Badge
+                        color="warning"
+                        variant="dot"
+                        invisible={!item.attention}
+                        title={item.attention}
+                        aria-label={item.attention}
+                    >
+                        {item.icon}
+                    </Badge>
+                </ListItemIcon>
+                <Typography
+                    variant="caption"
+                    title={item.label}
+                    sx={{
+                        fontWeight: isActiveItem ? 600 : 400,
+                        color: 'inherit',
+                        textAlign: 'center',
+                        lineHeight: 1.2,
+                        maxWidth: '100%',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                    }}
+                >
+                    {item.label}
+                </Typography>
+            </ListItemButton>
+        );
+    };
+    const listItems = activityItems.filter((item) => item.dock !== 'bottom');
+    const dockedItems = activityItems.filter((item) => item.dock === 'bottom');
+
     return (
         <Box
             sx={{ width: activityBarWidth, ...activityRailSx }}
@@ -104,61 +163,7 @@ export const ActivityBar: React.FC<ActivityBarProps> = ({
 
             {/* Activity Icons */}
             <Box sx={activityIconsScrollSx}>
-                {activityItems.map((item) => {
-                    const isActiveItem = activeActivity === item.key;
-                    // Mirrors Layout.handleActivityClick's own targetPath logic, so the
-                    // rendered href always matches where a click would actually navigate —
-                    // even for activities that own a level-2 sidebar (item.children).
-                    const firstNavChild = item.children?.find((c) => c.type !== 'divider');
-                    const targetPath = item.defaultPath || item.path || firstNavChild?.path;
-
-                    return (
-                        <ListItemButton
-                            key={item.key}
-                            component={targetPath ? RouterLink : 'div'}
-                            to={targetPath}
-                            onClick={() => onActivityClick(item)}
-                            sx={activityItemSx({
-                                '&:hover': {
-                                    bgcolor: isActiveItem ? 'primary.main' : 'action.hover',
-                                    color: isActiveItem ? 'primary.contrastText' : 'primary.main',
-                                },
-                                ...(isActiveItem && {
-                                    bgcolor: 'primary.main',
-                                    color: 'primary.contrastText',
-                                }),
-                            })}
-                        >
-                            <ListItemIcon sx={{ minWidth: 0, color: 'inherit', justifyContent: 'center' }}>
-                                <Badge
-                                    color="warning"
-                                    variant="dot"
-                                    invisible={!item.attention}
-                                    title={item.attention}
-                                    aria-label={item.attention}
-                                >
-                                    {item.icon}
-                                </Badge>
-                            </ListItemIcon>
-                            <Typography
-                                variant="caption"
-                                title={item.label}
-                                sx={{
-                                    fontWeight: isActiveItem ? 600 : 400,
-                                    color: 'inherit',
-                                    textAlign: 'center',
-                                    lineHeight: 1.2,
-                                    maxWidth: '100%',
-                                    overflow: 'hidden',
-                                    textOverflow: 'ellipsis',
-                                    whiteSpace: 'nowrap',
-                                }}
-                            >
-                                {item.label}
-                            </Typography>
-                        </ListItemButton>
-                    );
-                })}
+                {listItems.map(renderItem)}
 
                 <Divider sx={{ mx: 2, my: 1 }} />
 
@@ -229,6 +234,14 @@ export const ActivityBar: React.FC<ActivityBarProps> = ({
                 </Tooltip>
 
             </Box>
+
+            {/* Docked activities (Dashboard): always in view at the foot of
+                the rail, whatever the list above scrolls to. */}
+            {dockedItems.length > 0 && (
+                <Box sx={activityBottomClusterSx}>
+                    {dockedItems.map(renderItem)}
+                </Box>
+            )}
 
             {/* Gateway unreachable — docked in the rail instead of floating
                 over the page (FloatingStatusIndicators keeps that role on

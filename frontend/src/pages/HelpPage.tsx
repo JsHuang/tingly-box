@@ -26,7 +26,8 @@ type HelpSectionId = 'shortcut' | 'providers' | 'routing' | 'team';
  * HelpPage — the lightbulb entry in the activity bar: a small set of
  * easy-to-miss useful actions (desktop shortcut, browse & connect providers,
  * reopen the routing/tier/team guides). It is *not* the first-run landing —
- * OnboardingGate sends new installs to the agent page, whose Quick Start walks provider → model → install → apply. Help is where
+ * OnboardingGate sends everyone, new installs included, to the agent page,
+ * whose Quick Start walks provider → model → install → apply. Help is where
  * the same material stays reachable afterwards (ux-principles #10).
  *
  * Each section is an accordion (CollapsibleCard): title + one-line summary

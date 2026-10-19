@@ -1,28 +1,21 @@
-import { describe, expect, it } from 'vitest';
-import { landingPath } from './OnboardingGate';
+import { cleanup, render, screen } from '@testing-library/react';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { afterEach, describe, expect, it } from 'vitest';
+import OnboardingGate from './OnboardingGate';
 
-const items = [
-    { key: 'dashboard', defaultPath: '/dashboard/today' },
-    { key: 'scenario', defaultPath: '/agent' },
-    { key: 'projects', defaultPath: '/projects' },
-];
+afterEach(cleanup);
 
-describe('landing', () => {
-    it('lands a new install (nothing saved) on the agent page', () => {
-        expect(landingPath(null, items)).toBe('/agent');
-    });
-
-    it('reopens the activity the user was last in', () => {
-        expect(landingPath('dashboard', items)).toBe('/dashboard/today');
-        expect(landingPath('projects', items)).toBe('/projects');
-    });
-
-    it('opens /agent for the agent activity, so the last agent page wins', () => {
-        expect(landingPath('scenario', items)).toBe('/agent');
-    });
-
-    it('falls back to the agent page when the saved activity is gone', () => {
-        expect(landingPath('image', items)).toBe('/agent');
-        expect(landingPath('help', items)).toBe('/agent');
+describe('first-run landing', () => {
+    it('always lands on the agent page, with or without providers', () => {
+        render(
+            <MemoryRouter initialEntries={['/']}>
+                <Routes>
+                    <Route path="/" element={<OnboardingGate />} />
+                    <Route path="/help" element={<div>Help</div>} />
+                    <Route path="/agent" element={<div>Agent setup</div>} />
+                </Routes>
+            </MemoryRouter>,
+        );
+        expect(screen.getByText('Agent setup')).toBeVisible();
     });
 });

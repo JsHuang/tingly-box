@@ -59,6 +59,11 @@ export interface ActivityItem {
     children?: NavItem[];
     // Default path to use when there's no saved path in memory
     defaultPath?: string;
+    /**
+     * 'bottom' docks the rail icon at the foot of the rail, above the
+     * preferences button, instead of in the scrolling list.
+     */
+    dock?: 'bottom';
     /** Something here needs the user: a dot on the rail icon, with this as its hover text. */
     attention?: string;
     /**
