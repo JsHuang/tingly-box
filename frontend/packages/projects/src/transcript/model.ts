@@ -390,6 +390,38 @@ export const workingState = (blocks: TranscriptBlock[]): {verb: WorkingVerb; sin
     return {verb, since};
 };
 
+// Todo is one item of the agent's own progress list (Claude Code's TodoWrite).
+export interface Todo {
+    content: string;
+    // The present-tense form shown while the item is in progress.
+    activeForm?: string;
+    status: 'pending' | 'in_progress' | 'completed';
+}
+
+// latestTodos is the progress list as of the last TodoWrite call: each call
+// rewrites the whole list, so the last one is the current state. Undefined
+// when the agent never wrote one.
+export const latestTodos = (blocks: TranscriptBlock[]): Todo[] | undefined => {
+    for (let i = blocks.length - 1; i >= 0; i--) {
+        const b = blocks[i];
+        if (b.type !== 'activity') continue;
+        for (let j = b.steps.length - 1; j >= 0; j--) {
+            const s = b.steps[j];
+            if (s.type !== 'tool' || s.name !== 'TodoWrite') continue;
+            const raw = (s.input as {todos?: unknown} | null)?.todos;
+            if (!Array.isArray(raw)) continue;
+            const todos = raw.flatMap((x): Todo[] => {
+                const r = x as Partial<Todo> | null;
+                if (!r || typeof r.content !== 'string' || r.content.trim() === '') return [];
+                const status = r.status === 'completed' || r.status === 'in_progress' ? r.status : 'pending';
+                return [{content: r.content, activeForm: typeof r.activeForm === 'string' ? r.activeForm : undefined, status}];
+            });
+            return todos.length > 0 ? todos : undefined;
+        }
+    }
+    return undefined;
+};
+
 // RequestOutcome is how a request ended, or that it still waits.
 export type RequestOutcome = 'pending' | 'allowed' | 'denied' | 'answered' | 'declined' | 'unanswered';
 
@@ -507,3 +539,54 @@ export const formatTokens = (n: number): string => {
     if (n >= 1_000) return `${(n / 1_000).toFixed(1)}k`;
     return String(n);
 };
+
+// RunSummary is what a run of calls did, counted by what a reader asks
+// about: files read, searches, commands, files edited, anything else.
+export interface RunSummary {
+    read: number;
+    searched: number;
+    commands: number;
+    edited: number;
+    other: number;
+    failed: number;
+    // First to last step, when the steps carry times and it is at least a second.
+    durationMs?: number;
+}
+
+// The todo list has its own card; its calls are left out of a run's rows and count.
+export const CHECKLIST_TOOL = 'TodoWrite';
+
+const READ_TOOLS = new Set(['Read']);
+const SEARCH_TOOLS = new Set(['Grep', 'Glob']);
+const RUN_COMMAND_TOOLS = new Set(['Bash', 'BashOutput']);
+const RUN_EDIT_TOOLS = new Set(['Edit', 'MultiEdit', 'Write', 'NotebookEdit']);
+
+export const summarizeRun = (steps: ActivityStep[]): RunSummary => {
+    const sum: RunSummary = {read: 0, searched: 0, commands: 0, edited: 0, other: 0, failed: 0};
+    const edited = new Set<string>();
+    const times: number[] = [];
+    for (const s of steps) {
+        const at = s.timestamp ? Date.parse(s.timestamp) : NaN;
+        if (!Number.isNaN(at)) times.push(at);
+        if (s.type !== 'tool' || !s.name || s.name === CHECKLIST_TOOL) continue;
+        // A denied call fails by definition; its row already says so.
+        if (s.isError && !(s.request && requestOutcome(s.request, false) === 'denied')) sum.failed++;
+        if (READ_TOOLS.has(s.name)) sum.read++;
+        else if (SEARCH_TOOLS.has(s.name)) sum.searched++;
+        else if (RUN_COMMAND_TOOLS.has(s.name)) sum.commands++;
+        else if (RUN_EDIT_TOOLS.has(s.name)) {
+            const input = (s.input ?? {}) as Record<string, unknown>;
+            const path = input.file_path ?? input.notebook_path ?? input.path;
+            edited.add(typeof path === 'string' && path ? path : s.id);
+        } else sum.other++;
+    }
+    sum.edited = edited.size;
+    if (times.length > 1) {
+        const ms = Math.max(...times) - Math.min(...times);
+        if (ms >= 1000) sum.durationMs = ms;
+    }
+    return sum;
+};
+
+// A run of calls folds into one line once it has this many.
+export const FOLD_MIN_CALLS = 2;
