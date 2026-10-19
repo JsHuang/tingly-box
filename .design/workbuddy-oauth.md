@@ -151,6 +151,16 @@ present, else every `data.models[].id`. There is no embedded catalog entry:
 model ids are account- and region-specific, so a failed fetch shows an empty
 list rather than invented ids.
 
+### Responses requests
+
+WorkBuddy has no `/responses` upstream, but nothing a user does should
+surface that. Gateway traffic is routed to Chat by endpoint resolution, and the
+rule Endpoint toggle runs a direct Responses probe against the client, which
+used to fail with `workbuddy: /responses endpoint is not supported` and block
+switching. `WorkBuddyClient.ResponsesNew` now converts the request to chat,
+answers it through the stream fallback and maps the completion back to a
+Response. `ResponsesNewStreaming` returns an errored stream instead of nil.
+
 ## Quota
 
 `ProviderTypeWorkBuddy` (`ai/quota/fetcher/workbuddy.go`), one fetcher for both
