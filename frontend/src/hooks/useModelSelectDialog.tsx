@@ -1,4 +1,5 @@
-import { Dialog, DialogContent, DialogTitle } from '@mui/material';
+import { Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, Typography } from '@mui/material';
+import { useTranslation } from 'react-i18next';
 import React, { useCallback, useRef, useState } from 'react';
 import type { Provider } from '../types/provider';
 import ModelSelectDialog, { type ProviderSelectTabOption } from '@/components/ModelSelectDialog.tsx';
@@ -21,7 +22,8 @@ export interface UseModelSelectDialogOptions {
     rules: Rule[];
     onRuleChange?: (updatedRule: Rule) => void;
     showNotification: (message: string, severity: 'success' | 'error') => void;
-    onCreateFromModel?: (option: ProviderSelectTabOption) => void;
+    // Called from New Model with every picked model; the caller creates one rule each.
+    onCreateFromModels?: (options: ProviderSelectTabOption[]) => void;
 }
 
 interface EditingServiceContext {
@@ -40,8 +42,9 @@ export const useModelSelectDialog = (options: UseModelSelectDialogOptions) => {
         rules,
         onRuleChange,
         showNotification,
-        onCreateFromModel,
+        onCreateFromModels,
     } = options;
+    const { t } = useTranslation();
 
     // Dialog state
     const [open, setOpen] = useState(false);
@@ -51,6 +54,8 @@ export const useModelSelectDialog = (options: UseModelSelectDialogOptions) => {
     const [currentConfigRecord, setCurrentConfigRecord] = useState<ConfigRecord | null>(null);
     const [modelSelectionCleared, setModelSelectionCleared] = useState(false);
     const [currentAddTier, setCurrentAddTier] = useState<number | undefined>(undefined);
+    // Models picked so far when opened from New Model (multi-select), in pick order.
+    const [picked, setPicked] = useState<ProviderSelectTabOption[]>([]);
 
     // Refs for tracking context
     const currentSmartRuleIndexRef = useRef<number | null>(null);
@@ -128,14 +133,16 @@ export const useModelSelectDialog = (options: UseModelSelectDialogOptions) => {
         setCurrentAddTier(undefined);
         currentSmartRuleIndexRef.current = null;
         editingServiceContextRef.current = null;
+        setPicked([]);
         setOpen(true);
     }, []);
 
     // Handle model selection
     const handleModelSelect = useCallback((option: ProviderSelectTabOption) => {
         if (mode === 'create-rule') {
-            setOpen(false);
-            onCreateFromModel?.(option);
+            setPicked(prev => prev.some(p => p.provider.uuid === option.provider.uuid && p.model === option.model)
+                ? prev.filter(p => !(p.provider.uuid === option.provider.uuid && p.model === option.model))
+                : [...prev, option]);
             return;
         }
         if (!currentConfigRecord || !currentRuleUuid) return;
@@ -246,7 +253,7 @@ export const useModelSelectDialog = (options: UseModelSelectDialogOptions) => {
         setCurrentAddTier(undefined);
         currentSmartRuleIndexRef.current = null;
         editingServiceContextRef.current = null;
-    }, [currentConfigRecord, currentAddTier, currentRuleUuid, mode, editingServiceUuid, rules, onRuleChange, showNotification, onCreateFromModel]);
+    }, [currentConfigRecord, currentAddTier, currentRuleUuid, mode, editingServiceUuid, rules, onRuleChange, showNotification]);
 
     // Get selected provider and model for pre-selection
     const getSelectedProvider = useCallback(() => {
@@ -272,9 +279,13 @@ export const useModelSelectDialog = (options: UseModelSelectDialogOptions) => {
     // Get a unique key for ModelSelectTab to force remount when selection changes
     const dialogKey = open ? `${getSelectedProvider() || ''}-${getSelectedModel() || ''}` : 'closed';
 
+    const isPicked = useCallback((providerUuid: string, model: string) =>
+        picked.some(p => p.provider.uuid === providerUuid && p.model === model), [picked]);
+
     // Close dialog
     const closeModelSelect = useCallback(() => {
         setOpen(false);
+        setPicked([]);
         setCurrentRuleUuid(null);
         setCurrentConfigRecord(null);
         setEditingServiceUuid(null);
@@ -282,6 +293,12 @@ export const useModelSelectDialog = (options: UseModelSelectDialogOptions) => {
         currentSmartRuleIndexRef.current = null;
         editingServiceContextRef.current = null;
     }, []);
+
+    const submitPicked = useCallback(() => {
+        const options = picked;
+        closeModelSelect();
+        if (options.length > 0) onCreateFromModels?.(options);
+    }, [picked, closeModelSelect, onCreateFromModels]);
 
     // Dialog component. Kept as one stable component type: an inline React.FC
     // would be a new type on every render of the host page, remounting the
@@ -315,9 +332,31 @@ export const useModelSelectDialog = (options: UseModelSelectDialogOptions) => {
                     selectedProvider={getSelectedProvider()}
                     selectedModel={getSelectedModel()}
                     onSelected={handleModelSelect}
+                    isModelSelected={mode === 'create-rule' ? isPicked : undefined}
                     onSelectionClear={() => setModelSelectionCleared(true)}
                 />
             </DialogContent>
+            {mode === 'create-rule' && (
+                <DialogActions sx={{ px: 3, py: 1.5, borderTop: 1, borderColor: 'divider' }}>
+                    <Box sx={{ flex: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Typography variant="body2" color="text.secondary">
+                            {t('templateActions.selectedModels', { count: picked.length })}
+                        </Typography>
+                        {picked.length > 0 && (
+                            <Button size="small" onClick={() => setPicked([])}>
+                                {t('templateActions.clearSelection')}
+                            </Button>
+                        )}
+                    </Box>
+                    <Button
+                        variant="contained"
+                        disabled={picked.length === 0}
+                        onClick={submitPicked}
+                    >
+                        {t('templateActions.addModels', { count: picked.length })}
+                    </Button>
+                </DialogActions>
+            )}
         </Dialog>
     ));
 
