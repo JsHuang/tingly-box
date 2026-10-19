@@ -368,10 +368,10 @@
 | 两个 `AgentActivityDialog` 合成一个实例 | 会失去关闭时的淡出动画 |
 | 去掉 `wasAllDone` 自动隐藏 | 是行为取舍，不是纯简化 |
 
-## 9. 第 3 轮：rail 顺序跟着落地页
+## 9. 第 3 轮：落地页跟着常用走
 
-**发现（F15）**：落地页是 `/agent`（第 1 轮"落地不改"），rail 第一项却是 Dashboard。打开后高亮的是第二个图标，第一个图标是一个不是起点的页面，"从上往下读"和"我现在在哪"对不上。Dashboard 当初排第一，是为了承载"它正常吗"的概览页（`ui-redesign.md` P2）；概览页删掉以后，Dashboard 只剩用量图表，排第一的理由也没了。
+**发现（F15）**：rail 第一项是 Dashboard，落地页却固定是 `/agent`，而且 `OnboardingGate` 每次打开都会清掉上次所在的栏目。打开后亮的是第二个图标。
 
-**人工打标反馈（2026-10-19）**："默认开 agents，但 dashboard 在第一，这个交互再评审下"。
+**人工打标反馈（2026-10-19）**："默认开 agents，但 dashboard 在第一，这个交互再评审下"。第一版方案把 Agent 挪到第一，被否："dashboard 放最开始是因为常用"。rail 按使用频率排，这一点不改。
 
-**结论**：不动落地页，改 rail 顺序：使用（Agent / Team / Image / Projects）→ 用量（Dashboard）→ 增强（Remote / Prompt / Tools / Guardrails）→ 验证（Bench）→ 配置（Credential / System）。第一项就是落地页；Dashboard 观测的是上面那组"使用"，所以紧跟其后。Team / Image / Projects 可被开关隐藏，全部隐藏时 Dashboard 自然升到第二。反过来"默认进 Dashboard"被否：它与第 1 轮"落地不改"冲突，而且每天打开要做的事是配 Agent，不是看图表。
+**结论**：冲突不在顺序，在落地页不看使用。落地页改为回到上次所在的栏目（`layout.activeActivity`，Layout 本来就在存），打开它的默认页：常看 Dashboard 的人打开就是 Dashboard，在 Agent 上工作的人打开就是上次那个 Agent 页。新装没有记录，仍进 `/agent` 的 Quick Start（P6：智能默认而不是开关）；记录的栏目已隐藏或没有 rail 项（Help）时也回到 `/agent`。不选"一律进 Dashboard"，因为新装时图表是空的，还得再引导回 Agent。

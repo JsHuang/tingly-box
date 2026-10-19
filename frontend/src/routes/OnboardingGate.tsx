@@ -1,16 +1,33 @@
 import { Navigate } from 'react-router-dom';
+import { useActivityItems } from '@/layout/useActivityItems';
+import type { ActivityItem } from '@/layout/types';
 
-// OnboardingGate decides where a freshly-authenticated user lands: always
-// /agent, which opens the agent page they were last on. Brand-new installs
-// land there too — the agent pages carry the guided Quick Start (provider →
-// model → install → apply), so no separate "first-run" destination is needed.
-// (Previously, installs with no provider were sent to /help; that flow was
-// superseded by the agent-page Quick Start.) Stale activity state is cleared
-// so the default agent page, not a leftover activity, wins.
+const ACTIVITY_KEY = 'layout.activeActivity';
+
+function savedActivity(): string | null {
+    try {
+        return localStorage.getItem(ACTIVITY_KEY);
+    } catch {
+        return null;
+    }
+}
+
+// OnboardingGate decides where an authenticated user lands: back in the rail
+// activity they were last in, at its default page. The rail is ordered by how
+// often each activity is used (Dashboard first), so whoever lives in the
+// Dashboard opens straight into it, and whoever works on agents opens /agent.
+// A brand-new install has no saved activity and lands on /agent, whose guided
+// Quick Start (provider → model → install → apply) is the first-run path.
+// An activity that is gone (hidden, flag off) or has no rail item (Help)
+// falls back to /agent too.
+export function landingPath(saved: string | null, items: Pick<ActivityItem, 'key' | 'defaultPath'>[]): string {
+    const activity = saved ? items.find(item => item.key === saved) : undefined;
+    return activity?.defaultPath && activity.key !== 'scenario' ? activity.defaultPath : '/agent';
+}
+
 const OnboardingGate: React.FC = () => {
-    localStorage.removeItem('layout.activeActivity');
-    sessionStorage.removeItem('layout.activeActivity');
-    return <Navigate to="/agent" replace />;
+    const items = useActivityItems();
+    return <Navigate to={landingPath(savedActivity(), items)} replace />;
 };
 
 export default OnboardingGate;
