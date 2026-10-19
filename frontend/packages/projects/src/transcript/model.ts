@@ -21,6 +21,8 @@ export interface TranscriptEntry {
     author?: string;
     // Files attached to a user message.
     attachments?: TranscriptAttachment[];
+    // A user message added to a running turn that Claude has not read yet.
+    pending?: boolean;
     timestamp: string;
 }
 

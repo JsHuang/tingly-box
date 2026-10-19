@@ -104,6 +104,10 @@ type queued struct {
 	text string
 	from string
 	atts []Attachment
+	// held is a message the user queued on purpose: it has no user entry in
+	// the transcript yet, only the chip event eventID, until its turn comes.
+	held    bool
+	eventID string
 }
 
 // turnTally is what a turn's transcript entries add up to, for its report.
@@ -393,6 +397,15 @@ func (m *Threads) writeSettings(p *db.Project, t *db.Thread) error {
 // Send gives a thread a message from the user or the coordinator. A busy
 // thread runs it after its current turn.
 func (m *Threads) Send(ctx context.Context, threadID, text, from string, atts []Attachment) (*db.Thread, error) {
+	if _, err := m.sendable(threadID); err != nil {
+		return nil, err
+	}
+	m.enqueue(threadID, queued{text: text, from: from, atts: atts})
+	return m.store.GetThread(threadID)
+}
+
+// sendable is the thread if a message may be sent to it now.
+func (m *Threads) sendable(threadID string) (*db.Thread, error) {
 	t, err := m.store.GetThread(threadID)
 	if err != nil {
 		return nil, err
@@ -412,8 +425,7 @@ func (m *Threads) Send(ctx context.Context, threadID, text, from string, atts []
 	if t.Status == db.ThreadResolved {
 		return nil, ErrResolved
 	}
-	m.enqueue(threadID, queued{text: text, from: from, atts: atts})
-	return m.store.GetThread(threadID)
+	return t, nil
 }
 
 // enqueue records the message and starts a turn unless the thread is busy,
@@ -423,7 +435,12 @@ func (m *Threads) enqueue(threadID string, q queued) {
 	if err != nil {
 		return
 	}
-	m.addEvent(t, &db.ThreadEvent{Kind: db.EvUser, Content: q.text, From: q.from, Payload: AttachmentsPayload(q.atts)})
+	if q.held && m.Running(threadID) {
+		q.eventID = m.holdMessage(t, q)
+	} else {
+		q.held = false
+		m.addEvent(t, &db.ThreadEvent{Kind: db.EvUser, Content: q.text, From: q.from, Payload: AttachmentsPayload(q.atts)})
+	}
 	followingUp := m.engine.Busy(m.sessionOf(threadID))
 	m.mu.Lock()
 	if a, busy := m.active[threadID]; busy || followingUp {
@@ -448,6 +465,8 @@ func (m *Threads) enqueue(threadID string, q queued) {
 	a := &activeThread{current: &q}
 	m.active[threadID] = a
 	m.mu.Unlock()
+	// The turn ended while the message was being held: it goes now.
+	m.releaseHeld(t, &q)
 	go m.begin(threadID, a)
 }
 
@@ -660,6 +679,9 @@ func (m *Threads) next(threadID string) {
 	a.queue = a.queue[1:]
 	a.current = &q
 	m.mu.Unlock()
+	if t, err := m.store.GetThread(threadID); err == nil {
+		m.releaseHeld(t, &q)
+	}
 	go m.begin(threadID, a)
 }
 
@@ -754,6 +776,7 @@ func (m *Threads) stop(threadID string) <-chan struct{} {
 	m.mu.Lock()
 	if a, ok := m.active[threadID]; ok {
 		a.stopped = true
+		m.dropHeld(threadID, a.queue)
 		a.queue = nil
 		if a.cancel != nil {
 			a.cancel()
@@ -883,6 +906,10 @@ func (m *Threads) Recover() {
 		events, _ := m.store.ListThreadEvents(t.ID)
 		for i := range events {
 			e := &events[i]
+			if e.Kind == db.EvQueued && strings.Contains(e.Payload, `"state":"held"`) {
+				e.Payload = strings.Replace(e.Payload, `"state":"held"`, `"state":"removed"`, 1)
+				_ = m.store.UpdateThreadEvent(e)
+			}
 			if (e.Kind == db.EvApproval || e.Kind == db.EvAsk) && strings.Contains(e.Payload, `"state":"pending"`) {
 				e.Payload = strings.Replace(e.Payload, `"state":"pending"`, `"state":"expired"`, 1)
 				_ = m.store.UpdateThreadEvent(e)

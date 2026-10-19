@@ -763,8 +763,8 @@
         "tags": [
           "sessions"
         ],
-        "summary": "Send a message (runs after the current turn)",
-        "description": "Send a message (runs after the current turn)",
+        "summary": "Send a message; while a turn runs, mode says whether it joins the turn, waits for it or replaces it",
+        "description": "Send a message; while a turn runs, mode says whether it joins the turn, waits for it or replaces it",
         "operationId": "apiV1ProjectsSessionsSidMessagesPost",
         "parameters": [
           {
@@ -920,6 +920,48 @@
             }
           }
         },
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Thread"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/projects/sessions/{sid}/queue/{qid}": {
+      "delete": {
+        "tags": [
+          "sessions"
+        ],
+        "summary": "Take back a message held for after the running turn",
+        "description": "Take back a message held for after the running turn",
+        "operationId": "apiV1ProjectsSessionsSidQueueQidDelete",
+        "parameters": [
+          {
+            "name": "sid",
+            "in": "path",
+            "description": "Resource ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "qid",
+            "in": "path",
+            "description": "Resource ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful response",
@@ -2005,8 +2047,8 @@
         "tags": [
           "threads"
         ],
-        "summary": "Send a message straight to the thread (runs after its current turn)",
-        "description": "Send a message straight to the thread (runs after its current turn)",
+        "summary": "Send a message straight to the thread; while a turn runs, mode says whether it joins the turn, waits for it or replaces it",
+        "description": "Send a message straight to the thread; while a turn runs, mode says whether it joins the turn, waits for it or replaces it",
         "operationId": "apiV1ProjectsIdThreadsTidMessagesPost",
         "parameters": [
           {
@@ -2039,6 +2081,57 @@
             }
           }
         },
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Thread"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{id}/threads/{tid}/queue/{qid}": {
+      "delete": {
+        "tags": [
+          "threads"
+        ],
+        "summary": "Take back a message held for after the running turn",
+        "description": "Take back a message held for after the running turn",
+        "operationId": "apiV1ProjectsIdThreadsTidQueueQidDelete",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Resource ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "tid",
+            "in": "path",
+            "description": "Resource ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "qid",
+            "in": "path",
+            "description": "Resource ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful response",
@@ -3379,6 +3472,15 @@
           "content": {
             "type": "string",
             "description": "Field content"
+          },
+          "mode": {
+            "type": "string",
+            "description": "Field mode",
+            "enum": [
+              "send",
+              "queue",
+              "stop_and_send"
+            ]
           }
         },
         "required": [

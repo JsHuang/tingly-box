@@ -57,6 +57,7 @@ const preBox = {
 } as const;
 
 const UserBubble = ({message}: {message: TranscriptEntry}) => {
+    const {t} = useTranslation();
     const {attachments: Attachments} = useTranscriptHost();
     const files = message.attachments ?? [];
     return (
@@ -69,6 +70,11 @@ const UserBubble = ({message}: {message: TranscriptEntry}) => {
                 <Box sx={{maxWidth: '80%', bgcolor: 'action.hover', px: 1.75, py: 1, borderRadius: 1.5}}>
                     <Typography variant="body1" sx={conversationText}>{message.content}</Typography>
                 </Box>
+            )}
+            {message.pending && (
+                <Typography variant="caption" sx={{color: 'text.secondary', mt: 0.25}}>
+                    {t('projects.transcript.readsNext', {defaultValue: 'Claude will read this at its next step'})}
+                </Typography>
             )}
         </Box>
     );

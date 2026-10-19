@@ -394,8 +394,8 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Send a message (runs after the current turn)
-         * @description Send a message (runs after the current turn)
+         * Send a message; while a turn runs, mode says whether it joins the turn, waits for it or replaces it
+         * @description Send a message; while a turn runs, mode says whether it joins the turn, waits for it or replaces it
          */
         post: operations["apiV1ProjectsSessionsSidMessagesPost"];
         delete?: never;
@@ -459,6 +459,26 @@ export interface paths {
         put: operations["apiV1ProjectsSessionsSidProfilePut"];
         post?: never;
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/sessions/{sid}/queue/{qid}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Take back a message held for after the running turn
+         * @description Take back a message held for after the running turn
+         */
+        delete: operations["apiV1ProjectsSessionsSidQueueQidDelete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -890,11 +910,31 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Send a message straight to the thread (runs after its current turn)
-         * @description Send a message straight to the thread (runs after its current turn)
+         * Send a message straight to the thread; while a turn runs, mode says whether it joins the turn, waits for it or replaces it
+         * @description Send a message straight to the thread; while a turn runs, mode says whether it joins the turn, waits for it or replaces it
          */
         post: operations["apiV1ProjectsIdThreadsTidMessagesPost"];
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{id}/threads/{tid}/queue/{qid}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Take back a message held for after the running turn
+         * @description Take back a message held for after the running turn
+         */
+        delete: operations["apiV1ProjectsIdThreadsTidQueueQidDelete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -1479,6 +1519,11 @@ export interface components {
             attachments?: string[];
             /** @description Field content */
             content: string;
+            /**
+             * @description Field mode
+             * @enum {string}
+             */
+            mode?: "send" | "queue" | "stop_and_send";
         };
         SessionCreateRequest: {
             /** @description Field attachments */
@@ -2540,6 +2585,31 @@ export interface operations {
             };
         };
     };
+    apiV1ProjectsSessionsSidQueueQidDelete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource ID */
+                sid: string;
+                /** @description Resource ID */
+                qid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Thread"];
+                };
+            };
+        };
+    };
     apiV1ProjectsSessionsSidReopenPost: {
         parameters: {
             query?: never;
@@ -3262,6 +3332,33 @@ export interface operations {
                 "application/json": components["schemas"]["SendRequest"];
             };
         };
+        responses: {
+            /** @description Successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Thread"];
+                };
+            };
+        };
+    };
+    apiV1ProjectsIdThreadsTidQueueQidDelete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource ID */
+                id: string;
+                /** @description Resource ID */
+                tid: string;
+                /** @description Resource ID */
+                qid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             /** @description Successful response */
             200: {

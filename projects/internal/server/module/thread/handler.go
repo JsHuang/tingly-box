@@ -28,6 +28,10 @@ type SendRequest struct {
 	Content string `json:"content"`
 	// Attachments are paths returned by the project's attachments upload.
 	Attachments []string `json:"attachments,omitempty"`
+	// Mode is how the message meets a running turn: "send" (default) adds it
+	// to the turn, read at Claude's next step; "queue" holds it until the turn
+	// ends; "stop_and_send" interrupts the turn and sends it after.
+	Mode string `json:"mode,omitempty" enum:"send,queue,stop_and_send"`
 }
 
 // ThreadRespondRequest answers a pending approval or question.
@@ -67,8 +71,11 @@ func (h *Handler) RegisterRoutes(r *module.Routes) {
 		swagger.WithDescription("A thread with its transcript"),
 		swagger.WithResponseModel(ThreadDetailResponse{}))
 	api.POST("/projects/:id/threads/:tid/messages", h.send, tag,
-		swagger.WithDescription("Send a message straight to the thread (runs after its current turn)"),
+		swagger.WithDescription("Send a message straight to the thread; while a turn runs, mode says whether it joins the turn, waits for it or replaces it"),
 		swagger.WithRequestModel(SendRequest{}),
+		swagger.WithResponseModel(db.Thread{}))
+	api.DELETE("/projects/:id/threads/:tid/queue/:qid", h.unqueue, tag,
+		swagger.WithDescription("Take back a message held for after the running turn"),
 		swagger.WithResponseModel(db.Thread{}))
 	api.POST("/projects/:id/threads/:tid/respond", h.respond, tag,
 		swagger.WithDescription("Answer a permission request or question the thread is waiting on"),
@@ -143,6 +150,10 @@ func (h *Handler) send(c *gin.Context) {
 		apierr.BadRequest(c, "message is empty")
 		return
 	}
+	if !rt.SendMode(req.Mode).Valid() {
+		apierr.BadRequest(c, "unknown mode: "+req.Mode)
+		return
+	}
 	cur, ok := h.thread(c)
 	if !ok {
 		return
@@ -155,12 +166,24 @@ func (h *Handler) send(c *gin.Context) {
 			return
 		}
 	}
-	t, err := h.svc.Threads.Send(c.Request.Context(), cur.ID, req.Content, "user", atts)
+	t, err := h.svc.Threads.SendWith(c.Request.Context(), cur.ID, req.Content, atts, rt.SendMode(req.Mode))
 	if err != nil {
 		fail(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, t)
+}
+
+func (h *Handler) unqueue(c *gin.Context) {
+	cur, ok := h.thread(c)
+	if !ok {
+		return
+	}
+	if !h.svc.Threads.RemoveQueued(cur.ID, c.Param("qid")) {
+		apierr.Message(c, http.StatusConflict, "the message was already sent")
+		return
+	}
+	h.reply(c, cur.ID)
 }
 
 func (h *Handler) respond(c *gin.Context) {

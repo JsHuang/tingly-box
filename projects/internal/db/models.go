@@ -114,8 +114,13 @@ const (
 	EvApproval   = "approval"    // a permission request (payload: request + answer)
 	EvAsk        = "ask"         // a question for the user
 	EvSystem     = "system"      // lifecycle notes
-	EvError      = "error"
-	EvReport     = "report" // end-of-turn summary sent to the coordinator
+	// EvQueued is a message the user chose to send after the running turn,
+	// held until then (payload: state "held", "sent" or "removed", and the
+	// attachments). A held one shows above the composer; sending it adds the
+	// EvUser entry.
+	EvQueued = "queued"
+	EvError  = "error"
+	EvReport = "report" // end-of-turn summary sent to the coordinator
 	// Kept for folder sessions only (their pages render subagents and
 	// background tasks; project threads still show the plain transcript).
 	EvTask  = "task"  // a task event of a subagent or background command (payload: the event)

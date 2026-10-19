@@ -10,7 +10,7 @@ import { Composer } from '../Composer';
 import { AttachmentChips, uploadAttachments, type AttachOwner } from '../attachments';
 import { CodeBlock, Markdown } from '../Markdown';
 import { ConfirmDialog, CopyIconButton } from '@tingly/ui';
-import { ArrowBack, Branch, CheckCircle, DiffIcon, FolderOpen, Merge, MoreVert, Stream, Terminal, Undo } from '../icons';
+import { ArrowBack, Branch, CheckCircle, Close, DiffIcon, FolderOpen, Merge, MoreVert, Pencil, Stream, Terminal, Undo } from '../icons';
 import { useNotify } from '../../hooks/useNotify';
 import { folderName, formatTokens } from '../../utils/format';
 import { DiffDialog } from './DiffDialog';
@@ -126,6 +126,26 @@ export function ThreadPanel({ projectId, threadId, thread, events, running, disa
         const el = scrollRef.current;
         if (el && stick.current) el.scrollTop = el.scrollHeight;
     }, [events]);
+
+    // Messages held for after the running turn.
+    const held = useMemo(() => (events ?? []).flatMap((e) => {
+        if (e.kind !== 'queued') return [];
+        try {
+            return (JSON.parse(e.payload ?? '{}') as { state?: string }).state === 'held' ? [e] : [];
+        } catch {
+            return [];
+        }
+    }), [events]);
+    // Taking a held message back puts its text in the box to edit; the draft
+    // keeps whatever was typed meanwhile.
+    const takeBack = async (ids: string[], intoDraft: boolean) => {
+        const taken = held.filter((h) => ids.includes(h.id));
+        if (intoDraft && taken.length > 0) {
+            const text = taken.map((h) => h.content).filter((c) => c.trim() !== '').join('\n\n');
+            if (text) setDraft(draft.trim() === '' ? text : `${draft}\n\n${text}`);
+        }
+        await Promise.all(taken.map((h) => ops.unqueue(h.id).catch(() => undefined)));
+    };
 
     const coordinator = t('thread.fromCoordinator');
     const { blocks, pendingRequestId } = useMemo(() => {
@@ -313,6 +333,22 @@ export function ThreadPanel({ projectId, threadId, thread, events, running, disa
                         </Box>
                     </Alert>
                 )}
+                {held.length > 0 && (
+                    <Box sx={{ mb: 1, display: 'flex', flexDirection: 'column', gap: 0.5 }} aria-label={t('queue.heading')}>
+                        <Typography variant="caption" color="text.secondary">{t('queue.heading')}</Typography>
+                        {held.map((h) => (
+                            <Box key={h.id} sx={{ display: 'flex', alignItems: 'center', gap: 0.5, pl: 1.25, pr: 0.5, py: 0.25, borderRadius: 1, border: 1, borderColor: 'divider', borderStyle: 'dashed' }}>
+                                <Typography variant="body2" noWrap sx={{ flex: 1, minWidth: 0 }} title={h.content}>{h.content || t('queue.attachmentsOnly')}</Typography>
+                                <Tooltip title={t('queue.edit')}>
+                                    <IconButton size="small" onClick={() => void takeBack([h.id], true)} aria-label={t('queue.edit')}><Pencil sx={{ fontSize: 16 }} /></IconButton>
+                                </Tooltip>
+                                <Tooltip title={t('queue.remove')}>
+                                    <IconButton size="small" onClick={() => void takeBack([h.id], false)} aria-label={t('queue.remove')}><Close sx={{ fontSize: 16 }} /></IconButton>
+                                </Tooltip>
+                            </Box>
+                        ))}
+                    </Box>
+                )}
                 <Composer
                     context={composerContext}
                     minRows={1}
@@ -327,13 +363,22 @@ export function ThreadPanel({ projectId, threadId, thread, events, running, disa
                     })}
                     streaming={running}
                     sendWhileStreaming
-                    onStop={() => { void act(ops.stop); }}
+                    sendModes
+                    onStop={() => {
+                        // Stop drops what was held: hand it back to the box rather than lose it.
+                        if (held.length > 0) {
+                            const text = held.map((h) => h.content).filter((c) => c.trim() !== '').join('\n\n');
+                            if (text) setDraft(draft.trim() === '' ? text : `${draft}\n\n${text}`);
+                            notify(t('queue.returned'), 'info');
+                        }
+                        void act(ops.stop);
+                    }}
                     disabled={disabled || thread.status === 'resolved'}
                     placeholder={thread.status === 'resolved' ? t(session ? 'session.archivedPlaceholder' : 'thread.resolvedPlaceholder') : running ? t(session ? 'session.queuePlaceholder' : 'thread.queuePlaceholder') : t(session ? 'session.placeholder' : 'thread.placeholder')}
                     attach={(files) => uploadAttachments(owner, files)}
-                    onSend={async (text, attachments) => {
+                    onSend={async (text, attachments, mode) => {
                         try {
-                            await ops.send(text, attachments);
+                            await ops.send(text, attachments, mode);
                             stick.current = true;
                             return true;
                         } catch (e) {

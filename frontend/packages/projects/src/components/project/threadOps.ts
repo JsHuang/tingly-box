@@ -2,9 +2,13 @@
 // project's thread, or a folder session (a thread with no project). The
 // panel works with one of these so it never branches on the URL itself.
 import { api, unwrap, type Attachment } from '../../client';
+import type { SendMode } from '../Composer';
 
 export interface ThreadOps {
-    send: (content: string, attachments?: Attachment[]) => Promise<unknown>;
+    /** mode is only set when the user chose how to send while a turn runs; the default joins the turn. */
+    send: (content: string, attachments?: Attachment[], mode?: SendMode) => Promise<unknown>;
+    /** Takes back a message held for after the running turn. */
+    unqueue: (id: string) => Promise<unknown>;
     respond: (requestId: string, allow: boolean, remember: boolean, answer?: string, answers?: Record<string, string>) => Promise<unknown>;
     stop: () => Promise<unknown>;
     /** Resolve a thread; archive a session. */
@@ -17,7 +21,8 @@ export interface ThreadOps {
 export function projectThreadOps(projectId: string, tid: string): ThreadOps {
     const path = { params: { path: { id: projectId, tid } } };
     return {
-        send: (content, attachments) => unwrap(api.POST('/api/v1/projects/{id}/threads/{tid}/messages', { ...path, body: { content, attachments: attachments?.map((a) => a.path) } })),
+        send: (content, attachments, mode) => unwrap(api.POST('/api/v1/projects/{id}/threads/{tid}/messages', { ...path, body: { content, attachments: attachments?.map((a) => a.path), mode } })),
+        unqueue: (qid) => unwrap(api.DELETE('/api/v1/projects/{id}/threads/{tid}/queue/{qid}', { params: { path: { id: projectId, tid, qid } } })),
         respond: (request_id, allow, remember, answer, answers) => unwrap(api.POST('/api/v1/projects/{id}/threads/{tid}/respond', {
             ...path, body: { request_id, allow, scope: remember ? 'thread' : 'once', answer: answer || undefined, answers: answers && Object.keys(answers).length ? answers : undefined },
         })),
@@ -31,7 +36,8 @@ export function projectThreadOps(projectId: string, tid: string): ThreadOps {
 export function sessionOps(sid: string): ThreadOps {
     const path = { params: { path: { sid } } };
     return {
-        send: (content, attachments) => unwrap(api.POST('/api/v1/projects/sessions/{sid}/messages', { ...path, body: { content, attachments: attachments?.map((a) => a.path) } })),
+        send: (content, attachments, mode) => unwrap(api.POST('/api/v1/projects/sessions/{sid}/messages', { ...path, body: { content, attachments: attachments?.map((a) => a.path), mode } })),
+        unqueue: (qid) => unwrap(api.DELETE('/api/v1/projects/sessions/{sid}/queue/{qid}', { params: { path: { sid, qid } } })),
         respond: (request_id, allow, remember, answer, answers) => unwrap(api.POST('/api/v1/projects/sessions/{sid}/respond', {
             ...path, body: { request_id, allow, scope: remember ? 'thread' : 'once', answer: answer || undefined, answers: answers && Object.keys(answers).length ? answers : undefined },
         })),
