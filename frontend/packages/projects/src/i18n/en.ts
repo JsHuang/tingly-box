@@ -89,6 +89,8 @@ export const en = {
         step1: 'Describe what needs doing here — one task, a list, a bug report or a stack trace.',
         step2: 'The coordinator starts a thread for each task. Each thread is a Claude Code session working on its own branch.',
         step3: 'Walk away. Overview shows what is ready for review and which thread is waiting on you.',
+        updates_one: '{{count}} thread update', updates_other: '{{count}} thread updates',
+        updateKind: { finished: 'finished', needs_input: 'needs input', failed: 'failed' },
         tryExample: 'Try one',
         example1: 'Explore this repository and propose three improvements, without changing anything yet.',
         example2: 'Add a README section explaining how to run the tests.',

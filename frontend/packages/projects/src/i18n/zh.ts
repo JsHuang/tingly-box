@@ -93,6 +93,8 @@ export const zh: Dict<typeof en> = {
         step1: '在这里描述要做的事——一个任务、一串任务、一份 bug 报告或一段报错栈都可以。',
         step2: '协调者会为每个任务开一个线程。每个线程都是一个在独立分支上工作的 Claude Code 会话。',
         step3: '你可以走开。Overview 会告诉你哪些可以 review、哪个线程在等你。',
+        updates_one: '{{count}} 条线程回报', updates_other: '{{count}} 条线程回报',
+        updateKind: { finished: '已完成', needs_input: '需要你回复', failed: '失败' },
         tryExample: '试试这些',
         example1: '先探索这个仓库并提出三个改进建议，暂时不要改任何东西。',
         example2: '在 README 里加一节，说明如何运行测试。',
