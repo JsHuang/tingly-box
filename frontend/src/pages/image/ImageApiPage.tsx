@@ -99,32 +99,32 @@ const ImageApiPageContent: React.FC = () => {
                     </Box>
                 </AgentAccessSection>
                 <AgentPluginsCard scenario={scenario} />
-            <CardGrid>
-                <TemplatePage
-                    scenario={scenario}
-                    title={t('scenarioPage.imageGenModelRules')}
-                    collapsible={true}
-                    allowDeleteRule={true}
-                    // The header's Log is the way into this scenario's logs.
-                    hideTroubleshoot
-                    rules={rules}
-                    providers={providers}
-                    showNotification={showNotification}
-                    onRulesChange={handleRulesChange}
-                    onProvidersLoad={loadProviders}
-                    onRuleDelete={handleRuleDelete}
-                    loadRules={loadRules}
-                />
-                <ImageGenQuickStartDialog
-                    open={quickStartOpen}
-                    onClose={() => setQuickStartOpen(false)}
-                    baseUrl={baseUrl}
-                    model={firstModel || 'gpt-image-1'}
-                    onCopy={copyToClipboard}
-                />
-                <ScenarioLogDialog open={logOpen} onClose={() => setLogOpen(false)} scenario={scenario} title={t('agentStatus.log')} />
-                <AgentActivityDialog scenario={scenario} open={requestsOpen} onClose={() => setRequestsOpen(false)} />
-            </CardGrid>
+                <CardGrid>
+                    <TemplatePage
+                        scenario={scenario}
+                        title={t('scenarioPage.imageGenModelRules')}
+                        collapsible={true}
+                        allowDeleteRule={true}
+                        // The header's Log is the way into this scenario's logs.
+                        hideTroubleshoot
+                        rules={rules}
+                        providers={providers}
+                        showNotification={showNotification}
+                        onRulesChange={handleRulesChange}
+                        onProvidersLoad={loadProviders}
+                        onRuleDelete={handleRuleDelete}
+                        loadRules={loadRules}
+                    />
+                    <ImageGenQuickStartDialog
+                        open={quickStartOpen}
+                        onClose={() => setQuickStartOpen(false)}
+                        baseUrl={baseUrl}
+                        model={firstModel || 'gpt-image-1'}
+                        onCopy={copyToClipboard}
+                    />
+                    <ScenarioLogDialog open={logOpen} onClose={() => setLogOpen(false)} scenario={scenario} title={t('agentStatus.log')} />
+                    <AgentActivityDialog scenario={scenario} open={requestsOpen} onClose={() => setRequestsOpen(false)} />
+                </CardGrid>
             </Stack>
         </PageLayout>
     );

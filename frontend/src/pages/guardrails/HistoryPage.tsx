@@ -193,7 +193,6 @@ const GuardrailsHistoryPage = () => {
             }
         >
             <Stack spacing={3}>
-
                 <UnifiedCard title={rowCountLabel} size="full">
                     <Stack spacing={2}>
                         <Stack
