@@ -244,8 +244,27 @@ export function useActivityItems(): ActivityItem[] {
         pushGroup(codingTools);
         pushGroup(sdkTools);
 
-        // Rail order, top to bottom: use → power-ups → verify →
-        // configuration. Agent leads, matching the landing (OnboardingGate
+        // Children of the Power-ups rail item, one group per enabled feature.
+        const powerUpGroups: NavItem[][] = [];
+        if (enableGuardrails) {
+            powerUpGroups.push([
+                { path: '/guardrails', label: t('layout.guardrails'), icon: <IconShield sx={{ fontSize: 20 }} /> },
+                { path: '/guardrails/groups', label: t('layout.policyGroups'), icon: <IconLicense sx={{ fontSize: 20 }} /> },
+                { path: '/guardrails/rules', label: t('layout.policies'), icon: <IconLicense sx={{ fontSize: 20 }} /> },
+                { path: '/guardrails/credentials', label: t('layout.protectedCredentials', { defaultValue: 'Secrets' }), icon: <IconKey sx={{ fontSize: 20 }} /> },
+                { path: '/guardrails/history', label: t('layout.guardrailsHistory'), icon: <IconQuota sx={{ fontSize: 20 }} /> },
+            ]);
+        }
+        if (promptMenuItems.length > 0) powerUpGroups.push(promptMenuItems);
+        // Bench — the customizable end-to-end test workbench (.design/bench.md).
+        if (enableBench) {
+            powerUpGroups.push([
+                { path: '/bench', label: t('layout.bench', { defaultValue: 'Bench' }), icon: <IconTestPipe sx={{ fontSize: 20 }} /> },
+            ]);
+        }
+        const powerUpChildren: NavItem[] = powerUpGroups.flatMap((group, i) => (i === 0 ? group : [{ type: 'divider' as const }, ...group]));
+
+        // Rail order, top to bottom: use → power-ups → configuration. Agent leads, matching the landing (OnboardingGate
         // opens /agent, and Layout falls back to the 'scenario' activity).
         // Dashboard is used all the time but is not where work starts, so it
         // is docked at the foot of the rail, always in view and one click away.
@@ -332,12 +351,17 @@ export function useActivityItems(): ActivityItem[] {
                     { path: '/notify', label: t('layout.notify', { defaultValue: 'IM Notify' }), icon: <IconBell sx={{ fontSize: 20 }} /> },
                 ] as NavItem[],
             }] as ActivityItem[] : []),
-            ...(promptMenuItems.length > 0 ? [{
-                key: 'prompt' as const,
-                icon: <IconBrain sx={{ fontSize: 22 }} />,
-                label: t('common.prompt', { defaultValue: 'Prompt' }),
-                defaultPath: promptMenuItems.find((item): item is NavItemBase => !('type' in item))?.path,
-                children: promptMenuItems,
+            // Power-ups — one rail item for the opt-in features that act on
+            // requests rather than being somewhere you work: Guardrails, the
+            // Prompt pages and Bench. Each is still switched on in the
+            // Power-ups menu; this item lists the ones that are on, one group
+            // per feature, and is gone when none is.
+            ...(powerUpChildren.length > 0 ? [{
+                key: 'powerups' as const,
+                icon: <IconBolt sx={{ fontSize: 22 }} />,
+                label: t('layout.powerUps', { defaultValue: 'Power-ups' }),
+                defaultPath: powerUpChildren.find((item): item is NavItemBase => item.type !== 'divider')?.path,
+                children: powerUpChildren,
             }] as ActivityItem[] : []),
             ...(enableMCP ? [{
                 key: 'tools' as const,
@@ -348,32 +372,6 @@ export function useActivityItems(): ActivityItem[] {
                     { path: '/mcp/sources', label: 'MCP', icon: <SettingsApplications sx={{ fontSize: 20 }} /> },
                     { path: '/tools/servertool', label: t('layout.servertool', { defaultValue: 'Servertool' }), icon: <IconServer sx={{ fontSize: 20 }} /> },
                 ],
-            }] as ActivityItem[] : []),
-            ...(enableGuardrails ? [{
-                key: 'guardrails',
-                icon: <IconShield sx={{ fontSize: 22 }} />,
-                label: t('layout.guardrails'),
-                defaultPath: '/guardrails',
-                children: [
-                    { path: '/guardrails', label: t('layout.overview'), icon: <IconShield sx={{ fontSize: 20 }} /> },
-                    { path: '/guardrails/groups', label: t('layout.policyGroups'), icon: <IconLicense sx={{ fontSize: 20 }} /> },
-                    { path: '/guardrails/rules', label: t('layout.policies'), icon: <IconLicense sx={{ fontSize: 20 }} /> },
-                    { path: '/guardrails/credentials', label: t('layout.protectedCredentials', { defaultValue: 'Secrets' }), icon: <IconKey sx={{ fontSize: 20 }} /> },
-                    { path: '/guardrails/history', label: t('layout.guardrailsHistory'), icon: <IconQuota sx={{ fontSize: 20 }} /> },
-                ] as NavItem[],
-            }] as ActivityItem[] : []),
-            // Bench — the customizable end-to-end test workbench
-            // (.design/bench.md); a single page, so no sidebar children.
-            // Experimental, off by default (system.experimental "bench"
-            // flag) — same gating as Guardrails/MCP above. Sits after the
-            // power-ups it verifies rather than next to Dashboard, so an
-            // opt-in lab tool never pushes Agent down the rail.
-            ...(enableBench ? [{
-                key: 'bench' as const,
-                icon: <IconTestPipe sx={{ fontSize: 22 }} />,
-                label: t('layout.bench', { defaultValue: 'Bench' }),
-                path: '/bench',
-                defaultPath: '/bench',
             }] as ActivityItem[] : []),
             // ── Configuration: set once, rarely revisited ──
             {

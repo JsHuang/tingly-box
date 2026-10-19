@@ -378,3 +378,11 @@
 - 最终方向（产品负责人提出）："核心问题是 dashboard 在上面，能不能把它移到最下面"。
 
 **结论**：Dashboard 从滚动列表里拿出来，停靠在 rail 底部、偏好按钮上方（`ActivityItem.dock: 'bottom'`）。列表第一项就是落地页 Agent；Dashboard 常用，所以停靠区不随列表滚动，任何时候都在视野里、一次点击可达。底部是"看一眼"的位置（同 VS Code 的账户、设置），不和"开始干活"的入口争第一。落地页保持 `/agent` 不变。
+
+## 10. 第 4 轮：Power-ups 收成一个 rail 项
+
+**发现（F16）**：rail 上一级项太多、没有收束。Guardrails、Prompt（User Request / Skills）、Bench 都是在 Power-ups 菜单里打开的可选功能，打开后却各占一个 rail 图标，和 Agent、Dashboard 这类"在这里干活"的入口同级。
+
+**人工打标反馈（2026-10-19）**："把 guardrails、skills、prompt、bench 收敛到 power up……别的先不动"；并明确："不是 power up 那个菜单，而是新开一个项叫 power up，原来那个菜单是用来控制打开的，而不是用来管理 layout 的"。
+
+**结论**：新增 rail 项 Power-ups（闪电图标），放在原 Prompt 的位置；sidebar 按功能分组，组间用分隔线：Guardrails（概览行改名为 Guardrails，其余子页不变）→ Prompt 的 User Request / Skills → Bench。只列已打开的功能，全部关闭时整个 rail 项消失。Power-ups 菜单（偏好菜单里）职责不变，仍只管开关。Team、Image、Remote、Tools 本轮不动。同一个词指同一组东西：菜单里打开的，就出现在这个 rail 项里。
