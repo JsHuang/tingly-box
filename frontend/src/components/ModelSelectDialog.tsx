@@ -27,6 +27,8 @@ interface ModelSelectTabProps {
     // click on a model only reports it through onSelected (the caller toggles
     // it) and the cards show this instead of selectedProvider/selectedModel.
     isModelSelected?: (providerUuid: string, model: string) => boolean;
+    // Extra control at the start of the models toolbar row.
+    toolbarStart?: React.ReactNode;
     onSelectionClear?: () => void; // Called when selection should be cleared (e.g., after deleting selected model)
     onProviderChange?: (provider: Provider) => void; // Called when switching to a provider tab
     onCustomModelSave?: (provider: Provider, customModel: string) => void;
@@ -41,6 +43,7 @@ function ModelSelectTabInner({
     activeTab: externalActiveTab,
     onSelected,
     isModelSelected,
+    toolbarStart,
     onSelectionClear,
     onProviderChange,
     onCustomModelSave,
@@ -255,6 +258,7 @@ function ModelSelectTabInner({
                         isModelSelected={isModelSelected
                             ? (model) => isModelSelected(currentProvider.uuid, model)
                             : undefined}
+                        toolbarStart={toolbarStart}
                         columns={gridLayout.columns}
                         modelsPerPage={gridLayout.modelsPerPage}
                         onModelSelect={handleModelSelect}

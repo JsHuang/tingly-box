@@ -326,36 +326,12 @@ export const useModelSelectDialog = (options: UseModelSelectDialogOptions) => {
                 }
             }}
         >
-            {/* The multi-select switch sits on the title row it retitles; the
-                footer only exists while selecting, with the count next to the
-                action it feeds. */}
-            <DialogTitle sx={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center' }}>
-                <span />
-                <Box component="span" sx={{ textAlign: 'center' }}>
-                    {mode === 'create-rule'
-                        ? (multiSelect ? t('templateActions.multiSelectTitle') : 'Select a model for your new rule')
-                        : mode === 'add'
-                            ? 'Connect AI'
-                            : 'Choose Model'}
-                </Box>
-                {mode === 'create-rule' ? (
-                    <FormControlLabel
-                        labelPlacement="start"
-                        sx={{ justifySelf: 'end', mr: 0 }}
-                        slotProps={{ typography: { variant: 'body2', color: 'text.secondary' } }}
-                        control={
-                            <Switch
-                                size="small"
-                                checked={multiSelect}
-                                onChange={(e) => {
-                                    setMultiSelect(e.target.checked);
-                                    setPicked([]);
-                                }}
-                            />
-                        }
-                        label={t('templateActions.selectMultiple')}
-                    />
-                ) : <span />}
+            <DialogTitle sx={{ textAlign: 'center' }}>
+                {mode === 'create-rule'
+                    ? (multiSelect ? t('templateActions.multiSelectTitle') : 'Select a model for your new rule')
+                    : mode === 'add'
+                        ? 'Connect AI'
+                        : 'Choose Model'}
             </DialogTitle>
             <DialogContent>
                 <ModelSelectDialog
@@ -365,6 +341,25 @@ export const useModelSelectDialog = (options: UseModelSelectDialogOptions) => {
                     selectedModel={getSelectedModel()}
                     onSelected={handleModelSelect}
                     isModelSelected={mode === 'create-rule' && multiSelect ? isPicked : undefined}
+                    // The multi-select switch sits on the models toolbar row; the
+                    // footer only exists while selecting, the count beside its action.
+                    toolbarStart={mode === 'create-rule' ? (
+                        <FormControlLabel
+                            sx={{ ml: 0 }}
+                            slotProps={{ typography: { variant: 'body2' } }}
+                            control={
+                                <Switch
+                                    size="small"
+                                    checked={multiSelect}
+                                    onChange={(e) => {
+                                        setMultiSelect(e.target.checked);
+                                        setPicked([]);
+                                    }}
+                                />
+                            }
+                            label={t('templateActions.selectMultiple')}
+                        />
+                    ) : undefined}
                     onSelectionClear={() => setModelSelectionCleared(true)}
                 />
             </DialogContent>

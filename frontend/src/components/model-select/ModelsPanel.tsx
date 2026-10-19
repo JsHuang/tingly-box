@@ -68,6 +68,8 @@ export interface ModelsPanelProps {
     // Multi-select: which models of this provider are picked. Overrides
     // selectedProvider/selectedModel for the cards' selected state.
     isModelSelected?: (model: string) => boolean;
+    // Extra control at the start of the toolbar row (e.g. a mode switch).
+    toolbarStart?: React.ReactNode;
     columns: number;
     modelsPerPage: number;
     // True until this provider's model list first arrives: the panel shows a
@@ -86,6 +88,7 @@ export function ModelsPanel({
     selectedProvider,
     selectedModel,
     isModelSelected: isModelSelectedProp,
+    toolbarStart,
     columns,
     modelsPerPage,
     modelsLoading = false,
@@ -266,6 +269,7 @@ export function ModelsPanel({
                         justifyContent: "flex-end",
                         alignItems: "center"
                     }}>
+                    {toolbarStart}
                     {/* Action buttons */}
                     <Stack direction="row" spacing={1} sx={{
                         alignItems: "center"
