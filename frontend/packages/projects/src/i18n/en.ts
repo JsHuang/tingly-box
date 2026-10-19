@@ -91,6 +91,7 @@ export const en = {
         step3: 'Walk away. Overview shows what is ready for review and which thread is waiting on you.',
         openThread: 'Open thread',
         updateKind: { finished: 'finished', needs_input: 'needs input', failed: 'failed' },
+        showReports: 'Show thread reports', hideReports: 'Hide thread reports',
         tryExample: 'Try one',
         example1: 'Explore this repository and propose three improvements, without changing anything yet.',
         example2: 'Add a README section explaining how to run the tests.',

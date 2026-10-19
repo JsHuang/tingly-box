@@ -7,10 +7,12 @@ import type { Attachment, ProjectMessage, Thread } from '../../client';
 import { AttachmentChips, uploadAttachments } from '../attachments';
 import { Composer } from '../Composer';
 import { Markdown } from '../Markdown';
+import { readLocal, writeLocal } from '../../utils/storage';
 import { ChevronRight, DiffIcon, ExpandMore, PlayArrow } from '../icons';
 import { DiffDialog } from './DiffDialog';
 import { StatusIcon, statusColor, ThreadBadges, ThreadSubtitle, toneColor } from './threadStatus';
 
+const REPORTS_KEY = 'conversation.threadReports';
 const COLUMN = { maxWidth: 760, mx: 'auto', width: '100%', px: { xs: 2, md: 3 } } as const;
 
 function parse<T>(payload?: string): T | null {
@@ -203,6 +205,9 @@ export function ConversationPane({ projectId, messages, threads, busy, disabled,
     const scrollRef = useRef<HTMLDivElement>(null);
     const stick = useRef(true);
     const [seed, setSeed] = useState('');
+    // Thread reports are history, not news: shown by default, hideable per browser.
+    const [showReports, setShowReports] = useState(() => readLocal(REPORTS_KEY) !== '0');
+    const hasReports = messages.some((m) => m.kind === 'thread_update');
 
     useEffect(() => {
         const el = scrollRef.current;
@@ -268,7 +273,7 @@ export function ConversationPane({ projectId, messages, threads, busy, disabled,
                             // A thread's line above is its live state; each report is also its
                             // own folded entry here, in the order things happened.
                             case 'thread_update':
-                                return <ThreadUpdateRow key={m.id} message={m} onOpen={onOpenThread} />;
+                                return showReports ? <ThreadUpdateRow key={m.id} message={m} onOpen={onOpenThread} /> : null;
                             case 'error':
                                 return (
                                     <Alert key={m.id} severity="error" sx={{ my: 1.5, '& .MuiAlert-message': { minWidth: 0, wordBreak: 'break-word' } }}
@@ -291,6 +296,19 @@ export function ConversationPane({ projectId, messages, threads, busy, disabled,
             </Box>
             <Box sx={{ ...COLUMN, pb: 2 }}>
                 {disabledReason}
+                {hasReports && (
+                    <Box sx={{ display: 'flex', justifyContent: 'flex-end', pb: 0.5 }}>
+                        <Button size="small" color="inherit" aria-pressed={showReports}
+                            sx={{ minWidth: 0, py: 0, fontSize: fontSizes.sm, fontWeight: 400, color: 'text.secondary' }}
+                            onClick={() => {
+                                const next = !showReports;
+                                setShowReports(next);
+                                writeLocal(REPORTS_KEY, next ? '1' : '0');
+                            }}>
+                            {t(showReports ? 'conversation.hideReports' : 'conversation.showReports')}
+                        </Button>
+                    </Box>
+                )}
                 <Composer
                     autoFocus
                     disabled={disabled}
