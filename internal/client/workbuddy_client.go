@@ -99,12 +99,18 @@ func (c *WorkBuddyClient) ChatCompletionsNew(ctx context.Context, req openai.Cha
 	return &completion, nil
 }
 
-// ResponsesNew serves a Responses request over WorkBuddy's chat completions
-// endpoint: WorkBuddy has no /responses upstream, but that is an implementation
-// detail the caller (the rule Endpoint probe, a direct Responses request) must
-// not see. The request is converted to chat, answered through ChatCompletionsNew
-// (stream and accumulate), and the completion is mapped back to a Response.
+// ResponsesNew sends a Responses request upstream. WorkBuddy is a mixed
+// gateway: some models are served on /responses, the rest only on chat
+// completions, and the model list does not say which. So the request goes to
+// /responses first, and a refusal that means "no such endpoint for this model"
+// (404/405/501) is answered over chat completions instead: the request is
+// converted to chat, served through ChatCompletionsNew (stream and accumulate)
+// and the completion mapped back to a Response.
 func (c *WorkBuddyClient) ResponsesNew(ctx context.Context, req responses.ResponseNewParams) (*responses.Response, error) {
+	resp, err := c.OpenAIClient.ResponsesNew(ctx, req)
+	if err == nil || !workbuddyNoResponsesEndpoint(err) {
+		return resp, err
+	}
 	chatReq := request.ConvertOpenAIResponsesToChat(&req, 0)
 	completion, err := c.ChatCompletionsNew(ctx, *chatReq)
 	if err != nil {
@@ -113,11 +119,25 @@ func (c *WorkBuddyClient) ResponsesNew(ctx context.Context, req responses.Respon
 	return workbuddyChatToResponse(completion)
 }
 
-// ResponsesNewStreaming has no upstream to stream from. Gateway traffic never
-// gets here: endpoint resolution routes WorkBuddy providers to Chat and the
-// pipeline converts the stream itself.
+// ResponsesNewStreaming streams from the upstream /responses endpoint. Gateway
+// traffic for models without one never gets here: endpoint resolution routes
+// WorkBuddy providers to Chat unless the rule forces Responses.
 func (c *WorkBuddyClient) ResponsesNewStreaming(ctx context.Context, req responses.ResponseNewParams) *ssestream.Stream[responses.ResponseStreamEventUnion] {
-	return ssestream.NewStream[responses.ResponseStreamEventUnion](nil, errors.New("workbuddy: streaming Responses requests are served through chat completions by the gateway"))
+	return c.OpenAIClient.ResponsesNewStreaming(ctx, req)
+}
+
+// workbuddyNoResponsesEndpoint reports whether err says the upstream does not
+// serve /responses for the model, as opposed to a real failure of the call.
+func workbuddyNoResponsesEndpoint(err error) bool {
+	var apiErr *openai.Error
+	if !errors.As(err, &apiErr) {
+		return false
+	}
+	switch apiErr.StatusCode {
+	case http.StatusNotFound, http.StatusMethodNotAllowed, http.StatusNotImplemented:
+		return true
+	}
+	return false
 }
 
 // workbuddyChatToResponse maps a chat completion to a Responses object: the

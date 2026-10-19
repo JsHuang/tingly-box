@@ -153,13 +153,16 @@ list rather than invented ids.
 
 ### Responses requests
 
-WorkBuddy has no `/responses` upstream, but nothing a user does should
-surface that. Gateway traffic is routed to Chat by endpoint resolution, and the
-rule Endpoint toggle runs a direct Responses probe against the client, which
-used to fail with `workbuddy: /responses endpoint is not supported` and block
-switching. `WorkBuddyClient.ResponsesNew` now converts the request to chat,
-answers it through the stream fallback and maps the completion back to a
-Response. `ResponsesNewStreaming` returns an errored stream instead of nil.
+WorkBuddy is a mixed gateway: some models are served on `/responses`, the rest
+only on chat completions, and `/v3/config` does not say which. The rule
+Endpoint toggle runs a direct Responses probe against the client, and this used
+to fail with `workbuddy: /responses endpoint is not supported` for every model.
+`WorkBuddyClient.ResponsesNew` now calls `/responses` first and, only when the
+upstream answers 404/405/501 for the model, converts the request to chat,
+serves it through the stream fallback and maps the completion back to a
+Response. `ResponsesNewStreaming` goes straight to the upstream. Gateway
+traffic still resolves to Chat by default (the provider is created in Chat
+mode with no per-model catalog entry); a rule can force Responses.
 
 ## Quota
 

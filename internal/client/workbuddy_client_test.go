@@ -174,11 +174,15 @@ func TestWorkBuddyClientChatErrorKeepsStatus(t *testing.T) {
 	assert.Equal(t, http.StatusUnauthorized, apiErr.StatusCode)
 }
 
-// WorkBuddy has no /responses upstream, but a Responses request (the rule
-// Endpoint probe, a direct call) is still answered, over chat completions.
-func TestWorkBuddyClientResponsesNewServedOverChat(t *testing.T) {
+// A model without a /responses upstream still answers a Responses request (the
+// rule Endpoint probe, a direct call), over chat completions.
+func TestWorkBuddyClientResponsesNewFallsBackToChat(t *testing.T) {
 	var path string
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/v2/responses" {
+			http.Error(w, `{"error":{"message":"not found"}}`, http.StatusNotFound)
+			return
+		}
 		path = r.URL.Path
 		w.Header().Set("Content-Type", "text/event-stream")
 		_, _ = w.Write([]byte(`data: {"id":"c1","object":"chat.completion.chunk","model":"m","choices":[{"index":0,"delta":{"role":"assistant","content":"hi"},"finish_reason":"stop"}],"usage":{"prompt_tokens":3,"completion_tokens":1,"total_tokens":4}}` + "\n\ndata: [DONE]\n\n"))
@@ -202,4 +206,32 @@ func TestWorkBuddyClientResponsesNewServedOverChat(t *testing.T) {
 	assert.Equal(t, "/v2/chat/completions", path)
 	assert.Equal(t, "hi", resp.OutputText())
 	assert.EqualValues(t, 4, resp.Usage.TotalTokens)
+}
+
+// A model WorkBuddy serves on /responses is called there, not over chat.
+func TestWorkBuddyClientResponsesNewUsesUpstream(t *testing.T) {
+	var path string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		path = r.URL.Path
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"id":"resp_1","object":"response","status":"completed","model":"m","output":[{"type":"message","id":"msg_1","status":"completed","role":"assistant","content":[{"type":"output_text","text":"native","annotations":[]}]}]}`))
+	}))
+	t.Cleanup(server.Close)
+
+	provider := &typ.Provider{
+		UUID: "wb-4", Name: "WorkBuddy", APIBase: server.URL + "/v2", APIStyle: protocol.APIStyleOpenAI,
+		AuthType:    typ.AuthTypeOAuth,
+		OAuthDetail: &typ.OAuthDetail{Issuer: ai.IssuerWorkBuddy, AccessToken: "at-1"},
+	}
+	c, err := NewWorkBuddyClient(provider, "m", typ.SessionID{})
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = c.Close() })
+
+	resp, err := c.ResponsesNew(context.Background(), responses.ResponseNewParams{
+		Model: "m",
+		Input: responses.ResponseNewParamsInputUnion{OfString: param.NewOpt("hello")},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "/v2/responses", path)
+	assert.Equal(t, "native", resp.OutputText())
 }
