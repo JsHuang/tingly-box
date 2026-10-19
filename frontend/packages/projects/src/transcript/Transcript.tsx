@@ -1,4 +1,4 @@
-import {Block, Build, Cancel, Check, CheckCircle, ChevronRight, Close, ErrorOutline, ExpandMore, Help, Psychology, Robot, Terminal} from '@tingly/ui/icons';
+import {Block, Build, Cancel, Check, CheckCircle, ChevronRight, Close, ErrorOutline, ExpandMore, Help, Info, Psychology, Robot, Terminal} from '@tingly/ui/icons';
 import {Alert, Box, Button, Chip, CircularProgress, Collapse, Paper, Stack, Typography} from '@mui/material';
 import type {Theme} from '@mui/material/styles';
 import {getReadableAccent} from '@tingly/ui/theme/status';
@@ -299,7 +299,7 @@ const ActivityRun = ({steps, live, hold = false, expandAll, pendingRequestId}: {
             <Box data-call-ids={open ? undefined : ids.join(' ') || undefined}>
                 <RowLine open={open} onToggle={toggle} error={!open && sum.failed > 0 && !live}>
                     {/* The spinner belongs to the call that is running, in the rows below. */}
-                    {sum.failed > 0 && !live ? <ErrorOutline sx={{fontSize: 14, flexShrink: 0}}/> : <Build sx={{fontSize: 14, flexShrink: 0}}/>}
+                    <Info sx={{fontSize: 14, flexShrink: 0}}/>
                     <Typography variant="body2" noWrap sx={{flex: 1, minWidth: 0, color: 'inherit'}}>
                         {text}
                         {sum.durationMs !== undefined && <Box component="span" sx={{ml: 0.75}}>· {formatDuration(sum.durationMs)}</Box>}
