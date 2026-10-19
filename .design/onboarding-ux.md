@@ -42,7 +42,7 @@ a "Click here" tag — users can see exactly what to click.
 zero and covers the actions, not just the routing theory:
 
 1. **Connect an AI provider** — you need a credential first (Connect AI toolbar).
-2. **Add your first model** — `＋ Add model` in an empty rule; `New Model` for more (the toolbar button that creates rules: it picks one or several models and makes one rule per model, TEP-2128).
+2. **Add your first model** — `＋ Add model` in an empty rule; `New Model` for more (the toolbar button that creates rules: one model per click, or several with its Select multiple switch, one rule each; TEP-2128).
 3. **Change or remove a model** — click a service card to edit/swap, hover→trash.
 4. **Load balancing within a tier** — same-tier services share traffic.
 5. **Tier-based fallback chain** — T0 primary, cascade to T1/T2 on failure.

@@ -1,4 +1,4 @@
-import { Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, Typography } from '@mui/material';
+import { Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, FormControlLabel, Switch, Typography } from '@mui/material';
 import { useTranslation } from 'react-i18next';
 import React, { useCallback, useRef, useState } from 'react';
 import type { Provider } from '../types/provider';
@@ -54,7 +54,9 @@ export const useModelSelectDialog = (options: UseModelSelectDialogOptions) => {
     const [currentConfigRecord, setCurrentConfigRecord] = useState<ConfigRecord | null>(null);
     const [modelSelectionCleared, setModelSelectionCleared] = useState(false);
     const [currentAddTier, setCurrentAddTier] = useState<number | undefined>(undefined);
-    // Models picked so far when opened from New Model (multi-select), in pick order.
+    // New Model starts single-select (a click creates the rule); the footer's
+    // switch turns on multi-select, where clicks collect models in pick order.
+    const [multiSelect, setMultiSelect] = useState(false);
     const [picked, setPicked] = useState<ProviderSelectTabOption[]>([]);
 
     // Refs for tracking context
@@ -133,6 +135,7 @@ export const useModelSelectDialog = (options: UseModelSelectDialogOptions) => {
         setCurrentAddTier(undefined);
         currentSmartRuleIndexRef.current = null;
         editingServiceContextRef.current = null;
+        setMultiSelect(false);
         setPicked([]);
         setOpen(true);
     }, []);
@@ -140,6 +143,11 @@ export const useModelSelectDialog = (options: UseModelSelectDialogOptions) => {
     // Handle model selection
     const handleModelSelect = useCallback((option: ProviderSelectTabOption) => {
         if (mode === 'create-rule') {
+            if (!multiSelect) {
+                setOpen(false);
+                onCreateFromModels?.([option]);
+                return;
+            }
             setPicked(prev => prev.some(p => p.provider.uuid === option.provider.uuid && p.model === option.model)
                 ? prev.filter(p => !(p.provider.uuid === option.provider.uuid && p.model === option.model))
                 : [...prev, option]);
@@ -253,7 +261,7 @@ export const useModelSelectDialog = (options: UseModelSelectDialogOptions) => {
         setCurrentAddTier(undefined);
         currentSmartRuleIndexRef.current = null;
         editingServiceContextRef.current = null;
-    }, [currentConfigRecord, currentAddTier, currentRuleUuid, mode, editingServiceUuid, rules, onRuleChange, showNotification]);
+    }, [currentConfigRecord, currentAddTier, currentRuleUuid, mode, editingServiceUuid, rules, onRuleChange, showNotification, multiSelect, onCreateFromModels]);
 
     // Get selected provider and model for pre-selection
     const getSelectedProvider = useCallback(() => {
@@ -320,7 +328,7 @@ export const useModelSelectDialog = (options: UseModelSelectDialogOptions) => {
         >
             <DialogTitle sx={{ textAlign: 'center' }}>
                 {mode === 'create-rule'
-                    ? 'Select a model for your new rule'
+                    ? (multiSelect ? t('templateActions.multiSelectTitle') : 'Select a model for your new rule')
                     : mode === 'add'
                         ? 'Connect AI'
                         : 'Choose Model'}
@@ -332,29 +340,47 @@ export const useModelSelectDialog = (options: UseModelSelectDialogOptions) => {
                     selectedProvider={getSelectedProvider()}
                     selectedModel={getSelectedModel()}
                     onSelected={handleModelSelect}
-                    isModelSelected={mode === 'create-rule' ? isPicked : undefined}
+                    isModelSelected={mode === 'create-rule' && multiSelect ? isPicked : undefined}
                     onSelectionClear={() => setModelSelectionCleared(true)}
                 />
             </DialogContent>
             {mode === 'create-rule' && (
-                <DialogActions sx={{ px: 3, py: 1.5, borderTop: 1, borderColor: 'divider' }}>
+                <DialogActions sx={{ px: 3, py: 1.5, minHeight: 64, borderTop: 1, borderColor: 'divider' }}>
                     <Box sx={{ flex: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <Typography variant="body2" color="text.secondary">
-                            {t('templateActions.selectedModels', { count: picked.length })}
-                        </Typography>
-                        {picked.length > 0 && (
+                        <FormControlLabel
+                            sx={{ ml: 0 }}
+                            control={
+                                <Switch
+                                    size="small"
+                                    checked={multiSelect}
+                                    onChange={(e) => {
+                                        setMultiSelect(e.target.checked);
+                                        setPicked([]);
+                                    }}
+                                />
+                            }
+                            label={t('templateActions.selectMultiple')}
+                        />
+                        {multiSelect && (
+                            <Typography variant="body2" color="text.secondary">
+                                {t('templateActions.selectedModels', { count: picked.length })}
+                            </Typography>
+                        )}
+                        {multiSelect && picked.length > 0 && (
                             <Button size="small" onClick={() => setPicked([])}>
                                 {t('templateActions.clearSelection')}
                             </Button>
                         )}
                     </Box>
-                    <Button
-                        variant="contained"
-                        disabled={picked.length === 0}
-                        onClick={submitPicked}
-                    >
-                        {t('templateActions.addModels', { count: picked.length })}
-                    </Button>
+                    {multiSelect && (
+                        <Button
+                            variant="contained"
+                            disabled={picked.length === 0}
+                            onClick={submitPicked}
+                        >
+                            {t('templateActions.addModels', { count: picked.length })}
+                        </Button>
+                    )}
                 </DialogActions>
             )}
         </Dialog>

@@ -152,7 +152,7 @@ export default {
           },
           "addModel": {
             "title": "Add your first model",
-            "content": "Each rule maps a request model to one or more models. In an empty rule, click ＋ Add model to pick a connected provider and a model. Want more models on this agent? Use New Model in the toolbar: pick one or several, and each gets its own rule.",
+            "content": "Each rule maps a request model to one or more models. In an empty rule, click ＋ Add model to pick a connected provider and a model. Want more models on this agent? Use New Model in the toolbar; turn on Select multiple there to add several at once, one rule each.",
             "annotation": {
               "addModel": "＋ Add model — pick provider + model",
               "newRule": "New Model adds models, one rule each"
@@ -300,6 +300,8 @@ export default {
     "createNewRule": "Add models to this agent; each one gets its own routing rule",
     "selectedModels_one": "{{count}} model selected",
     "selectedModels_other": "{{count}} models selected",
+    "multiSelectTitle": "Create a rule for each model",
+    "selectMultiple": "Select multiple",
     "clearSelection": "Clear",
     "addModels_one": "Add {{count}} model",
     "addModels_other": "Add {{count}} models",
