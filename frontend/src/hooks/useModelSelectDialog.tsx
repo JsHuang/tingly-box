@@ -326,12 +326,36 @@ export const useModelSelectDialog = (options: UseModelSelectDialogOptions) => {
                 }
             }}
         >
-            <DialogTitle sx={{ textAlign: 'center' }}>
-                {mode === 'create-rule'
-                    ? (multiSelect ? t('templateActions.multiSelectTitle') : 'Select a model for your new rule')
-                    : mode === 'add'
-                        ? 'Connect AI'
-                        : 'Choose Model'}
+            {/* The multi-select switch sits on the title row it retitles; the
+                footer only exists while selecting, with the count next to the
+                action it feeds. */}
+            <DialogTitle sx={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center' }}>
+                <span />
+                <Box component="span" sx={{ textAlign: 'center' }}>
+                    {mode === 'create-rule'
+                        ? (multiSelect ? t('templateActions.multiSelectTitle') : 'Select a model for your new rule')
+                        : mode === 'add'
+                            ? 'Connect AI'
+                            : 'Choose Model'}
+                </Box>
+                {mode === 'create-rule' ? (
+                    <FormControlLabel
+                        labelPlacement="start"
+                        sx={{ justifySelf: 'end', mr: 0 }}
+                        slotProps={{ typography: { variant: 'body2', color: 'text.secondary' } }}
+                        control={
+                            <Switch
+                                size="small"
+                                checked={multiSelect}
+                                onChange={(e) => {
+                                    setMultiSelect(e.target.checked);
+                                    setPicked([]);
+                                }}
+                            />
+                        }
+                        label={t('templateActions.selectMultiple')}
+                    />
+                ) : <span />}
             </DialogTitle>
             <DialogContent>
                 <ModelSelectDialog
@@ -344,43 +368,23 @@ export const useModelSelectDialog = (options: UseModelSelectDialogOptions) => {
                     onSelectionClear={() => setModelSelectionCleared(true)}
                 />
             </DialogContent>
-            {mode === 'create-rule' && (
-                <DialogActions sx={{ px: 3, py: 1.5, minHeight: 64, borderTop: 1, borderColor: 'divider' }}>
-                    <Box sx={{ flex: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <FormControlLabel
-                            sx={{ ml: 0 }}
-                            control={
-                                <Switch
-                                    size="small"
-                                    checked={multiSelect}
-                                    onChange={(e) => {
-                                        setMultiSelect(e.target.checked);
-                                        setPicked([]);
-                                    }}
-                                />
-                            }
-                            label={t('templateActions.selectMultiple')}
-                        />
-                        {multiSelect && (
-                            <Typography variant="body2" color="text.secondary">
-                                {t('templateActions.selectedModels', { count: picked.length })}
-                            </Typography>
-                        )}
-                        {multiSelect && picked.length > 0 && (
-                            <Button size="small" onClick={() => setPicked([])}>
-                                {t('templateActions.clearSelection')}
-                            </Button>
-                        )}
-                    </Box>
-                    {multiSelect && (
-                        <Button
-                            variant="contained"
-                            disabled={picked.length === 0}
-                            onClick={submitPicked}
-                        >
-                            {t('templateActions.addModels', { count: picked.length })}
+            {mode === 'create-rule' && multiSelect && (
+                <DialogActions sx={{ px: 3, py: 1.5, gap: 1, borderTop: 1, borderColor: 'divider' }}>
+                    {picked.length > 0 && (
+                        <Button size="small" onClick={() => setPicked([])}>
+                            {t('templateActions.clearSelection')}
                         </Button>
                     )}
+                    <Typography variant="body2" color="text.secondary">
+                        {t('templateActions.selectedModels', { count: picked.length })}
+                    </Typography>
+                    <Button
+                        variant="contained"
+                        disabled={picked.length === 0}
+                        onClick={submitPicked}
+                    >
+                        {t('templateActions.addModels', { count: picked.length })}
+                    </Button>
                 </DialogActions>
             )}
         </Dialog>
