@@ -63,6 +63,7 @@ func (h *Handler) GetClaudeConfig(c *gin.Context) {
 		DefaultMode:           defaultMode,
 		InstallStatusLine:     snapshot.StatusLine,
 		ShowThinkingSummaries: agent.NormalizeClaudeCodeShowThinkingSummaries(snapshot.ShowThinkingSummaries),
+		CoAuthoredBy:          agent.NormalizeClaudeCodeCoAuthoredBy(snapshot.CoAuthoredBy),
 	})
 }
 
@@ -242,6 +243,15 @@ func (h *Handler) ApplyClaudeConfig(c *gin.Context) {
 	var opts []config.ApplyOption
 	opts = append(opts, config.WithDefaultMode(defaultMode))
 	opts = append(opts, config.WithShowThinkingSummaries(agent.NormalizeClaudeCodeShowThinkingSummaries(req.ShowThinkingSummaries)))
+	// A request without a Co-Authored-By choice (one-click apply) keeps the
+	// user's earlier choice; a file that never had one gets tb's default, off.
+	coAuthoredBy := req.CoAuthoredBy
+	if coAuthoredBy == nil {
+		if snapshot, readErr := agent.ReadMainClaudeCodeSettings(); readErr == nil {
+			coAuthoredBy = snapshot.CoAuthoredBy
+		}
+	}
+	opts = append(opts, config.WithCoAuthoredBy(agent.NormalizeClaudeCodeCoAuthoredBy(coAuthoredBy)))
 	if req.InstallStatusLine {
 		var scriptCreated bool
 		statusLinePath, scriptCreated, err = config.InstallStatusLineScript()

@@ -3835,6 +3835,7 @@ export const handlers = [
             defaultMode: 'acceptEdits',
             installStatusLine: true,
             showThinkingSummaries: true,
+            coAuthoredBy: false,
         })
     }),
 

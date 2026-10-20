@@ -50,6 +50,7 @@ func TestGetClaudeConfig_RestoresAppliedPreferences(t *testing.T) {
 		"env":{"CLAUDE_CODE_MAX_OUTPUT_TOKENS":"64000"},
 		"defaultMode":"plan",
 		"showThinkingSummaries":false,
+		"includeCoAuthoredBy":true,
 		"statusLine":{"type":"command","command":"status.sh"}
 	}`), 0644))
 
@@ -69,6 +70,7 @@ func TestGetClaudeConfig_RestoresAppliedPreferences(t *testing.T) {
 	assert.Equal(t, "plan", response.DefaultMode)
 	assert.Equal(t, "64000", response.Preferences.ClaudeCodeMaxOutputTokens)
 	assert.False(t, response.ShowThinkingSummaries)
+	assert.True(t, response.CoAuthoredBy)
 }
 
 func TestGetCodexConfig_RestoresAppliedPreferences(t *testing.T) {

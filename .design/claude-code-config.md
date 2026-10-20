@@ -109,6 +109,30 @@ nested one is absent — so a hand-edited or externally-written file that only
 sets one of the two still round-trips correctly through the Quick Config and
 Profile Overrides forms.
 
+### 3.2 Co-Authored-By: one switch, two keys, off by default
+
+Claude Code credits itself in commits and PRs through two keys: the legacy
+top-level `includeCoAuthoredBy` (deprecated) and the newer `attribution`
+object (`commit` / `pr` text; an empty string hides that credit, and newer
+CLIs let it win over the legacy key). Users think of this as one choice, so
+Quick Config shows one switch ("Commit attribution") whose key badge and hint
+name both keys, and `WithCoAuthoredBy` → `applyCoAuthoredBy`
+(`apply_config_claude.go`) writes both:
+
+- **Off** (tb's default, unlike Claude Code's): `includeCoAuthoredBy: false`
+  and `attribution.commit` / `attribution.pr` set to `""`.
+- **On**: `includeCoAuthoredBy: true`, and an `attribution` that only hid the
+  credit is dropped so Claude Code's own text returns; one with the user's own
+  text is kept.
+
+`readCoAuthoredBy` (`cc_settings.go`) reads it back the way Claude Code does:
+`attribution.commit` first (missing key = default credit = on), then
+`includeCoAuthoredBy`, else unset. An apply request without `coAuthoredBy`
+(one-click apply, the 1M toggle's re-apply) keeps what the file says and
+falls back to off only when it says nothing, so a user who turned it on is
+not silently reverted. The manual tab's JSON uses `coAuthoredBySettings`, the
+frontend twin of the same rule.
+
 ---
 
 ## 4. UI structure
