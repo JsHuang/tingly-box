@@ -167,7 +167,7 @@ until phase 4.
    `@cc` sessions (`ChatID="web"`). Projects owns its storage to stand alone,
    with no live sharing and no import; showing IM sessions in the panel can
    come back as a TB-only section later.
-2. **Data model.** Chosen: thread without a project (above). Say if you want
+2. **Data model.** Chosen: thread without a project (above). *Superseded by [projects-im.md](./projects-im.md): a working folder becomes a project with `kind=workdir`, so every thread has a `project_id`.* Say if you want
    the one-thread-project alternative instead.
 3. **Flag** (decided). The `desk` flag is removed as a whole and everything is under `projects`: no migration and no alias, since Desk never shipped. Its gate, nav entry and experimental toggle are deleted.
 4. **Cutover timing.** Phase 4 only after phase 3 reaches parity, one release
