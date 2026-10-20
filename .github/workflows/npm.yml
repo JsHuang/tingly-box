@@ -317,7 +317,8 @@ jobs:
         run: |
           VERSION="${{ needs.setup.outputs.npx_version }}"
           # A successful `npm publish` doesn't mean a package is queryable
-          # yet — npm's read replicas can lag behind the write by minutes.
+          # yet — npm's read replicas can lag behind the write by many minutes, so
+          # poll once a minute for up to 30.
           # Wait for every platform package the shim depends on (not just
           # linux-x64) to actually be visible before trusting them: a user
           # installing before that would resolve no binary for their
@@ -329,7 +330,7 @@ jobs:
               if npm view "${name}@${VERSION}" version >/dev/null 2>&1; then
                 echo "ok" > "$log"; return 0
               fi
-              sleep 10
+              sleep 60
             done
             echo "timeout" > "$log"
           }
@@ -343,7 +344,7 @@ jobs:
             log="$RUNNER_TEMP/ready-$(echo "$name" | tr '/@' '__').status"
             case "$(cat "$log" 2>/dev/null)" in
               ok) echo "✅ ${name}@${VERSION} ready" ;;
-              *)  echo "❌ ${name}@${VERSION} not visible on the registry after 5 minutes"; FAILED=1 ;;
+              *)  echo "❌ ${name}@${VERSION} not visible on the registry after 30 minutes"; FAILED=1 ;;
             esac
           done < ../../../built.txt
           [ "$FAILED" -eq 0 ]
