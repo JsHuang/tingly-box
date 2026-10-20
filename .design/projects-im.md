@@ -3,6 +3,9 @@
 > 状态：提案（TEP #2143）。承接 [projects-desk-absorption.md](./projects-desk-absorption.md)：Desk 已并入，
 > 这里把 Remote 的 IM 聊天（`@cc`）也并进来，并**重新打开**那篇 Decisions §1“`@cc` 不共享、不导入”。
 > 本文里的 schema、API 和里程碑都是提案，不是现状。图见 [projects-im.pencil.md](./projects-im.pencil.md)。
+>
+> **数据模型以 [projects-sessions.md](./projects-sessions.md) 为准**：会话是唯一单位，IM 绑定指向会话（`session_id`），
+> 不再是 `project_id`/`workdir_id`/`focus_thread_id`。下面“数据模型”和“统一到 Project ID”两节保留为演变记录，其中与之冲突处以新文档为准。
 
 ## 决定
 
@@ -28,7 +31,7 @@
 | 输出渲染（流式、折叠、文件发送） | `remote/control/render`、`imbot-output.md` | 不动；输入换成线程事件 |
 | Remote 页面 | `frontend/src/pages/remote-agent` | 删除，内容分到 Projects（见前端） |
 
-## 数据模型（Projects 一侧）
+## 数据模型（Projects 一侧）——已被 projects-sessions.md 取代
 
 概念上，所有落点是同一种东西：**会话入口**（entry）。每个入口有一个 ID 和一个类别（kind），类别决定“谁来接话”：
 `project` 由 coordinator 接话并开线程，`workdir` 直接是一个文件夹里的会话。以后加新的类别（例如只聊天的入口）
@@ -82,97 +85,23 @@ Projects 事件 ──▶ 订阅了该落点的 binding ──▶ 渲染到 chat
 - 回复前缀：已绑定时每条回复带落点短名（例：`[tingly-box] …`），避免用户忘了自己在哪。
 - 一个 chat 同一时刻只绑一个落点；一个落点可以被多个 chat 绑定（手机和群各一个），出站按 binding 广播。
 
-## 统一到 Project ID（M2a，待讨论）
+## 统一到 Project ID（已被取代）
 
-图见 [projects-im.pencil.md](./projects-im.pencil.md) 的 “One entity, two kinds”。
-
-### 现在的样子
-
-- 项目：`projects` 表，一个项目下有线程（`threads.project_id` 指向它）和一个 coordinator 对话（`project_messages`）。
-- 工作目录：没有自己的行。`workdirs` 表只存“保存了哪些文件夹”（主键是路径，没有 id）；文件夹里的会话是
-  `project_id` 为空、`worktree` 等于文件夹路径的线程。
-- 所以“落点”有两种身份：项目 id、文件夹路径。代码里有 12 处 `ProjectID == ""` 在区分两者，接口也是两套
-  （`/projects/:id/...` 和 `/projects/sessions`、`/projects/workdirs`），前端的页面、侧栏、等待信号也各算各的。
-
-### 目标
-
-只有一种实体 `Project`，用 `kind` 区分：
-
-| | `kind=project` | `kind=workdir` |
-|---|---|---|
-| 谁接话 | coordinator（项目对话） | 无；消息直接发给当前会话 |
-| 线程 | coordinator 或用户开，每个线程一个 worktree 分支 | 用户开，工作在文件夹里，无分支 |
-| 目标、指令、记忆、文件库、仓库 | 有 | 无（界面不显示） |
-| review、合并、汇报 | 有 | 无 |
-| `path` | 空 | 文件夹路径，唯一 |
-| 侧栏分组 | 项目 | 工作目录 |
-| IM 绑定 | 有，进项目对话 | 有，进当前会话 |
-
-线程总是有 `project_id`。原来要判断“有没有项目”的地方，改为判断所属项目的 `kind`。
-
-### 迁移
-
-升级时一次性做，幂等：
-1. `projects` 加 `kind`（默认 `project`）和 `path`。
-2. 对 `workdirs` 表的每个路径，以及 `project_id` 为空的线程用到的每个 `worktree` 路径，各建一个
-   `kind=workdir` 的项目（名字取文件夹名，`created_at`/`updated_at` 取原来的创建和最近使用时间）。
-3. 把这些线程的 `project_id` 回填成新项目的 id。
-4. 之后 `project_id` 不再允许为空（SQLite 改列约束麻烦，用写入时校验加启动时检查，不重建表）。
-5. `workdirs` 表保留一个版本不再读写，下个版本删除，给回滚留余地。
-
-不丢数据：线程、事件、`session_id` 和附件都不动，只是多了所属项目。
-
-### 地址：`project_id[/thread_id]`
-
-线程不是第三种 `kind`：它总属于某个入口，会结束，有分支和 worktree，一个入口下有多个，做成 `kind` 就要有 `parent`，
-模型变成两层。但在路由和绑定上，入口和线程用同一套地址：
-
-| 地址 | 含义 | 对应 |
-|---|---|---|
-| `project_id` | 项目：给 coordinator；workdir：给当前会话 | 绑定只填 `project_id` |
-| `project_id/thread_id` | 直接给这个线程 | 绑定再填 `focus_thread_id`（`/focus`） |
-| 单条消息点名 | 只送这一条，不改绑定 | `@N`、引用回复 |
-
-所以模型里仍只有 `Project(kind)` 一个实体；workdir 可以看成“没有 coordinator、只有一个当前线程”的入口。
-
-### 接口（建议先不动外部路径）
-
-- `GET /projects` 默认只返回 `kind=project`，`?kind=workdir` 返回工作目录；响应里的 `Project` 多 `kind`、`path`。
-- 现有 `/projects/sessions`、`/projects/workdirs` 保留，内部改成查 `kind=workdir` 的项目，前端不用同时改。
-  等前端按入口统一后再收敛成 `/projects/:id/threads`（M2a 之外）。
-- 页面路径：工作目录用 `/projects/:id`（页面按 `kind` 选布局），旧的 `/projects/folder?path=` 重定向过去。
-
-### 影响面
-
-- 后端：threads、transcript、attachment、channels 里 12 处 `ProjectID == ""` 改成 kind 判断；
-  `DeleteProject` 对工作目录要等同于“移除文件夹”，会话保留的语义（现在“移除只是不在侧栏显示”）改成 `archived_at`。
-- 前端：侧栏两组改成按 `kind` 过滤同一个列表，等待信号合并成一份计数；项目页和工作目录页共用 `WorkspaceLayout`，
-  只是不显示项目才有的区块。
-- IM：绑定只有 `project_id`，路由按 kind 分支，`/new`、`/stop` 作用于工作目录的当前会话。
-
-### 风险
-
-- 迁移写错会让会话“消失”：要有一个迁移前后线程总数、每个线程都有归属的校验，并在测试里用一份带文件夹会话的旧库快照跑一遍。
-- 同一路径大小写、末尾斜杠、软链接不一致会产生重复的工作目录项目：入库前统一规范化路径，唯一索引兜底。
-- 外部调用方（独立版 Projects 的使用者）看到的 `Project` 多了字段，列表默认值不变，应当兼容。
-
-### 需要拍板
-
-1. 外部路径是否先不动（建议），还是同一个 PR 里也统一？
-2. 工作目录是否出现在“项目”列表页里（建议不出现，列表默认 `kind=project`）？
-3. “移除文件夹”要不要真的删会话？（建议只归档项目，会话保留，和现在一致。）
+曾提议给 `Project` 加 `kind`（`project`/`workdir`），所有落点认 `project_id`。讨论中确认：coordinator 对话、线程、文件夹会话、
+IM 聊天本质上都是“与 agent 的一次交互”（Claude Code 自己也是这样存的：子 agent 是独立转录，渠道是消息的 `origin` 属性），
+所以单位应当是**会话**，不是项目。完整设计、调研、命名和迁移见 [projects-sessions.md](./projects-sessions.md)。
 
 ## 在 IM 里点名线程
 
 project 绑定的 chat 默认在跟 coordinator 说话；要对某个线程说话，需要能“点名”。点名是一次 `@`：
 
-- **线程编号**：每个线程在项目内有稳定的短编号 `#1`、`#2`（新增 `Thread.Seq`，项目内自增，不复用）。线程的通知、
+- **线程编号**：每个线程在项目内有稳定的短编号 `#1`、`#2`（新增 `Session.seq`，项目内自增，不复用）。线程的通知、
   汇报、审批、提问消息都带 `[#2 标题]` 前缀。
 - **主路径 `@2 补上边界用例`**：行首 `@` 加编号，整条消息去给线程 2，不改变 chat 的状态，每次显式，不会发错。
 - **顺手路径：引用回复**线程的某条消息，消息去给那个线程。不需要记编号，但容易忘记，所以它只是快捷方式，不是唯一入口。
   平台不支持引用回复时，这条路径不存在，`@` 仍可用。
 - **兜底 `/focus #2`**：之后的普通消息都进线程 2，回复前缀 `[#2 …]`；`/back` 或该线程结束后退回 coordinator。
-  聚焦只存在绑定上，不改线程本身，用于长时间只盯一个线程的场景。
+  聚焦就是把绑定改到那个会话，`/back` 改回它的父会话（projects-sessions.md），不改线程本身，用于长时间只盯一个线程的场景。
 - **`/threads`**：列出项目的线程（“等你处理”排前），每行带按钮：聚焦、停止、查看最近一条回复。
 - 审批和提问始终直接发到对应线程，按钮带编号，不受聚焦影响。
 - 优先级：引用回复 > 行首 `@N` > 聚焦 > coordinator。
@@ -204,8 +133,8 @@ project 绑定的 chat 默认在跟 coordinator 说话；要对某个线程说�
 | | 范围 | 不做 | 状态 |
 |---|---|---|---|
 | **M1 只到 coordinator**（先做） | `ChannelBinding`（只支持 project）、消息来源字段、绑定的增删查接口；绑了项目的 chat 的消息进项目对话，coordinator 的回复和折叠后的线程汇报发回 chat；前端：侧栏 IM 入口、项目页头标签、绑定弹窗、对话里的来源图标 | working folder 绑定、IM 里的审批/提问（只发一行“有线程等你，请到 Web 处理”）、点名线程、下线旧路径 | 后端已实现（见下“M1 后端的落地”）；前端另行 |
-| **M2a 统一到 Project ID** | `Project.kind`、线程 `project_id` 必填、`Workdir` 和文件夹会话迁成 `kind=workdir` 的项目、绑定表去掉 `workdir_id`；Projects 内部重构，不涉及 IM 行为 | IM 路由、前端新功能 | |
-| **M2b 工作目录绑定** | 绑定到 `kind=workdir` 的项目，消息进当前会话（取代 `@cc`）；`/new`、`/stop`；目录浏览器改为新建工作目录；前端绑定弹窗列出两类 | 同 M1 | |
+| **S1 / S2 会话统一模型** | 见 [projects-sessions.md](./projects-sessions.md) 的里程碑：S1 数据模型与迁移，S2 接口与前端 | IM 路由、前端新功能 | |
+| **M2b 文件夹绑定** | 绑定改为 `session_id`；绑文件夹、`/new`、`/stop`；弹窗列项目和文件夹 | 同 M1 | |
 | **M3 审批与提问进 IM** | 线程审批/提问发到所有绑定的 chat，按钮，先答为准，另一边改写为“已处理” | | |
 | **M4 点名线程** | `Thread.Seq`、`@N`、引用回复、`/threads`、`/focus` | | |
 | **M5 收尾** | 未绑定走 coordinator；删 SmartGuide、Remote 页面、`remote/session`；旧绑定转换 | | |
@@ -218,7 +147,7 @@ M3 之前，需要审批的线程在 IM 里只有提示，靠 Web 处理，这�
 
 对应上面的提案，落地时的具体形状（与提案不同或提案没写到的地方）：
 
-- **表与字段**：`channel_bindings`（`(platform, chat_id)` 唯一；`target_kind` 目前只有 `project`；`workdir_id`、`focus_thread_id` 可空，留给 M2/M4（M2a 决定改为只认 `project_id`，`target_kind`、`workdir_id` 随之去掉））。`project_messages` 新增 `source`（`im`，空=Web）、`source_platform`、`source_chat_id`。删除项目会一并解绑它的 chat。
+- **表与字段**：`channel_bindings`（`(platform, chat_id)` 唯一；`target_kind` 目前只有 `project`；`workdir_id`、`focus_thread_id` 可空，留给 M2/M4（S1 折成 `session_id`，`target_kind`、`workdir_id`、`focus_thread_id` 随之去掉））。`project_messages` 新增 `source`（`im`，空=Web）、`source_platform`、`source_chat_id`。删除项目会一并解绑它的 chat。
 - **接口**（`/api/v1/projects` 下）：`GET /channel-bindings?project_id=`、`PUT /channel-bindings`（`platform`、`chat_id`、`project_id`，可选 `chat_title`；已绑定的 chat 再绑即**改绑**，同一行）、`DELETE /channel-bindings/:id`。归档的项目不能被绑定。
 - **入站**：`remoteagent.ProjectRouter`（小接口，`BotHandler` 可选持有）在 `HandleMessage` 里、`@cc`/`@tb` 握手词检测**之前**取走**已绑定 chat 的非斜杠文本**；斜杠命令（`/help`、`/bind`、`/cd`…）、正在输入 `/cd` 路径的 chat、以及访问控制/配对/黑名单都照旧在它前面或旁边。没有绑定的 chat 不受任何影响。绑定了项目的 chat 发附件，回一句“暂不支持”，而不是悄悄送去 `@cc`。投递失败（如项目已暂停）会把原因回给 chat。
 - **走 Web 同一条路径**：入站只是 `Coordinator.PostFrom`（`Post` 加来源），所以排队、暂停/归档检查、事件推送都和 Web 一致。
