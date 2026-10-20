@@ -124,6 +124,7 @@ func TestCoordinatorRoutesWorkToThreadsAndRelaysReports(t *testing.T) {
 		}
 	}}
 	coord := NewCoordinator(f.store, f.threads.layout, f.threads.hub, f.threads, ai)
+	t.Cleanup(func() { settleCoordinator(coord) })
 
 	_, err := coord.Post(f.project.ID, "Update the docs, and fix the login bug.", nil, Source{})
 	require.NoError(t, err)
@@ -184,6 +185,7 @@ func TestProposeThenStartSuggestions(t *testing.T) {
 		}})}}
 	}}
 	coord := NewCoordinator(f.store, f.threads.layout, f.threads.hub, f.threads, ai)
+	t.Cleanup(func() { settleCoordinator(coord) })
 	_, err := coord.Post(f.project.ID, "Plan the migration first.", nil, Source{})
 	require.NoError(t, err)
 	msgs := waitMessages(t, f.store, f.project.ID, func(m []db.ThreadEvent) bool { return countKind(m, db.EvSuggestions) == 1 })

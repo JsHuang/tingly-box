@@ -65,7 +65,7 @@ func newFixture(t *testing.T, script func(turn *enginetest.Turn) error) *testFix
 	require.NoError(t, layout.Ensure(p.ID))
 	a := &enginetest.Agent{Script: script}
 	th := NewThreads(store, layout, NewHub(), Agents{Service: a.Service()}, staticEnv{})
-	t.Cleanup(func() { th.Shutdown(context.Background()) })
+	t.Cleanup(func() { shutdownAndSettle(th) })
 	f := &testFixture{store: store, threads: th, agent: a, project: p, repo: repo, reports: make(chan Report, 10)}
 	th.OnReport = func(rep Report) { f.reports <- rep }
 	return f
@@ -290,7 +290,7 @@ func TestThreadOnScriptedClaudeCLI(t *testing.T) {
 	require.NoError(t, err)
 	svc.RegisterAgent(agentboot.AgentTypeClaude, claude.NewAgentWithFactory(claude.Config{}, fixture.Factory(script)))
 	th := NewThreads(store, layout, NewHub(), Agents{Service: svc}, staticEnv{})
-	t.Cleanup(func() { th.Shutdown(context.Background()) })
+	t.Cleanup(func() { shutdownAndSettle(th) })
 	reports := make(chan Report, 1)
 	th.OnReport = func(r Report) { reports <- r }
 
