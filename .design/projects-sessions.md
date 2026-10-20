@@ -1,184 +1,163 @@
-# Projects 的会话统一模型
+# Projects 的统一模型：一切会话都是 Thread
 
-> 状态：提案，待 YZ 拍板最后几处（见“需要拍板”）。取代 [projects-im.md](./projects-im.md) 里“统一到 Project ID”一节，
+> 状态：已定方向，待实现。取代 [projects-im.md](./projects-im.md) 里“统一到 Project ID”一节，
 > 也取代 [projects-desk-absorption.md](./projects-desk-absorption.md) 的数据模型决定。图见
-> [projects-im.pencil.md](./projects-im.pencil.md) 的 “Sessions”。
+> [projects-im.pencil.md](./projects-im.pencil.md) 的 “Threads as the unit”。文件名沿用 `projects-sessions.md`。
 
 ## 为什么
 
-IM 要并进 Projects，需要回答“一个聊天绑到哪”。先后试过三种答案：绑项目、绑项目或工作目录、给项目加 `kind`。
-每次都发现同一件事：**项目的 coordinator 对话、项目里的线程、文件夹里的会话、IM 里的一次聊天，本质上都是用户与 agent 的一次交互**，
+IM 要并进 Projects，需要回答“一个聊天绑到哪”。先后试过绑项目、绑项目或工作目录、给项目加 `kind`，
+每次都发现同一件事：**项目对话、项目里的线程、文件夹里的会话、IM 里的一次聊天，本质上都是用户与 agent 的一次交互**，
 区别只是有没有父、有没有分支、谁在听。现在的代码把它们分在三处：`project_messages`、`threads`、
-`project_id` 为空的 `threads`，各有各的接口、事件和等待信号；`Thread.Worktree` 在文件夹会话里其实是文件夹路径，
-`Thread.SessionID` 又是 Claude Code 的会话 id，名字都在互相打架。
+`project_id` 为空的 `threads`，各有各的接口、事件和等待信号；`Thread.Worktree` 在文件夹会话里其实是文件夹路径，名字也不对。
 
-大批量推广之前一次理顺，比之后带着旧数据再改便宜得多。
+这一版把设计、模式、迁移和变更一次做完，不分期留旧路径。
 
 ## Claude 自己怎么做（调研）
 
-查的是 Claude Code 在本机落盘的结构（会话转录 jsonl、子 agent 目录、session 注册信息），不是猜的：
+查的是 Claude Code 在本机落盘的结构（会话转录 jsonl、子 agent 目录、session 注册信息）：
 
 - **会话是唯一单位**：一次交互就是一份转录，带 `sessionId`。
 - **子 agent 也是一份独立转录**：有自己的 `agentId`，`meta` 里记着 `spawnDepth`、触发它的 `toolUseId`、自己的 worktree 和分支。
   和主会话的区别只有一个“父指针”，存储和消息格式一样。
-- **渠道是消息的属性**：每条消息有 `origin`（`human`、`peer`、`task-notification`），每个会话有 `entrypoint`
-  （这个会话是 `remote_projects`）。Web、IM、子 agent 回报，对会话来说都只是“这条消息从哪来”。
-- **会话之间可以互发消息**：每个会话有名字和通信端点，`peer` 消息不分上下级。
+- **渠道是消息的属性**：每条消息有 `origin`（`human`、`peer`、`task-notification`），每个会话有 `entrypoint`。
+  Web、IM、子 agent 回报，对会话来说都只是“这条消息从哪来”。
+- **会话之间可以互发消息**，不分上下级。
 
-结论：层级、渠道、隔离方式（worktree）都是会话的**属性**，不是不同的实体。我们照这个做。
+结论：层级、渠道、隔离方式（worktree）都是会话的**属性**，不是不同的实体。
 
-## 模型
-
-只有三样东西：
+## 模型：沿用 Thread，只有三样东西
 
 ```
-Project     一组会话共享的上下文（目标、指令、仓库、记忆、文件库）；kind = project | folder
-Session     唯一的会话单位；parent、role、cwd、分支都是属性
-Event       会话里的一步（消息、工具调用、审批……）；来源是属性
+Project   一组线程共享的上下文（目标、指令、仓库、记忆、文件库）；type = project | folder
+Thread    唯一的会话单位；parent_id、cwd、分支、agent 都是属性
+Event     线程里的一步（消息、工具调用、审批……）；来源是属性
 ```
+
+**不引入 role。** 名字都用现有的：项目的对话是它的“主线程”，它派生出来的是“线程”，文件夹里的也是线程。
+有没有父、有没有分支，看属性，不看另一个类别。
 
 ### Project
 
-`kind=project`：有目标、指令、仓库、记忆，下面有一个 coordinator 会话和若干 worker 会话。
-`kind=folder`：一个文件夹，没有 coordinator，下面是若干 solo 会话。`path` 是规范化后的文件夹路径，唯一。
-今天的 `Workdir` 表和 `project_id` 为空的文件夹会话都变成它。新的类别（例如只聊天的入口）只是多一个 `kind`。
+- `type=project`：有目标、指令、仓库、记忆；`main_thread_id` 指向它的主线程（原来的 coordinator 对话），
+  主线程派生子线程，每个子线程一个分支。
+- `type=folder`：一个文件夹；没有主线程，下面是若干平级线程；`path` 是规范化后的文件夹路径，唯一。
 
-`kind` 只管 Project 级的东西：有没有目标和记忆、侧栏分哪一组、能不能 review 合并。**它不管路由**，路由只看会话。
+今天的 `Workdir` 表和 `project_id` 为空的文件夹会话都变成它。新的类别只是多一个 `type`。
+`type` 只管 Project 级的东西（有没有目标和记忆、侧栏分哪一组、能不能 review 合并），**不管路由**，路由只看线程。
 
-### Session
+### Thread
 
-由 `Thread` 改名并扩展，coordinator 对话也落成一个会话：
-
-| 字段 | 含义 | 备注 |
+| 字段 | 变化 | 含义 |
 |---|---|---|
-| `id` | 会话 id | 绑定、地址、事件都认它 |
-| `project_id` | 所属项目 | 必填（原来文件夹会话为空） |
-| `parent_id` | 父会话 | worker 的父是 coordinator；solo 和 coordinator 为空 |
-| `role` | `coordinator` / `worker` / `solo` | 界面上的叫法按它定，见下 |
-| `agent` | 谁在跑 | `llm`（coordinator 的循环）/ `claude-code`；以后加别的 |
-| `seq` | 项目内编号 | 给 `@N` 用，自增不复用 |
-| `cwd` | agent 运行的目录 | 取代 `Worktree`；文件夹会话就是文件夹，worker 是它的隔离目录，coordinator 是项目目录 |
-| `repo_path`、`base_branch`、`branch` | 隔离分支 | 有 `branch` 才表示在独立分支上；文件夹会话为空 |
-| `engine_session_id` | Claude Code 的会话 id，用于续接 | 取代 `SessionID`，不再和“会话”撞名 |
-| `created_by` | `coordinator` / `suggestion` / `user` | 取代 `Thread.Origin`，让 `origin` 只留给事件 |
-| 其余 | `title`、`task`、`status`、`wait_reason`、`model`、`profile`、`permission_mode`、`auto_answer`、用量、`last_report`… | 不变 |
+| `project_id` | 必填 | 原来文件夹会话为空 |
+| `parent_id` | 新增 | 子线程指向它的主线程；主线程和文件夹线程为空 |
+| `seq` | 新增 | 项目内编号，自增不复用，给 `@N` 用 |
+| `agent` | 新增 | 谁在跑：`llm`（主线程的循环）或 `claude-code`；以后加别的 |
+| `cwd` | 由 `worktree` 改名 | agent 运行的目录。文件夹线程是文件夹本身，子线程是它的隔离目录，主线程是项目目录 |
+| `repo_path`、`base_branch`、`branch` | 不变 | 有 `branch` 才表示在独立分支上 |
+| `session_id` | 不变 | Claude Code 的会话 id，用于续接 |
+| `origin`、`title`、`task`、`status`、`model`、`profile`、… | 不变 | |
 
-界面上的叫法：`worker` 叫“线程”（和 Claude Projects 一致），`solo` 叫“会话”，`coordinator` 叫“项目对话”。
-**一个实体，由 `role` 决定标签**，代码里不再有第二个词。
+界面上：主线程叫“项目对话”，其余都叫“线程”，文件夹页里也是“线程”。
 
 ### Event
 
-`ThreadEvent` 和 `ProjectMessage` 合成一张 `session_events`：`session_id`、`kind`、`content`、`payload`、`request_id`、
-`parent`（子 agent 的 Agent 调用）、`created_at` 不变，新增来源：
+`ProjectMessage` 并入 `thread_events`（`ThreadEvent` 的列不变：`kind`、`content`、`payload`、`request_id`、`parent`、`created_at`），
+主线程的消息就是主线程的事件，`thread_started`、`suggestions`、`thread_update` 直接作为事件 `kind`，payload 不变。
+来源用已有的 `source` 一组字段泛化，取代 `From`：
 
-| 来源字段 | 含义 |
+| 字段 | 含义 |
 |---|---|
-| `origin` | `web` / `im` / `session` / `system` |
-| `origin_ref` | `session` 时是发送方会话 id（coordinator→worker 的指令、worker→coordinator 的汇报都是它） |
-| `origin_platform`、`origin_chat` | `im` 时的平台和 chat |
-
-coordinator 特有的消息种类（`thread_started`、`suggestions`、`thread_update`）直接作为事件 `kind`，payload 不变。
-原来的 `From`（`user`/`coordinator`）由 `origin` 取代。
+| `source` | 空（Web）/ `im` / `thread`（别的线程发来，如主线程给子线程的指令、子线程的汇报）/ `system` |
+| `source_ref` | `thread` 时是发送方线程 id |
+| `source_platform`、`source_chat_id` | `im` 时的平台和 chat |
 
 ### 绑定
 
 ```
-ChannelBinding(platform, chat_id) ──▶ session_id
+ChannelBinding(platform, chat_id) ──▶ thread_id
 ```
 
-一个 chat 绑定一个会话，唯一键 `(platform, chat_id)`，没有 `target_kind`、`workdir_id`、`focus_thread_id`。
+一个 chat 绑定一个线程，唯一键 `(platform, chat_id)`；没有 `target_kind`、`workdir_id`、`focus_thread_id`。
 
-- 绑项目：`session_id` 是它的 coordinator 会话，**界面上选项目，后端解析成 coordinator**。
-- 绑文件夹：`session_id` 是当前 solo 会话。`/new` 开新会话并把绑定移过去，旧会话留在文件夹里。
-- `/focus #2` 是改绑到 worker；`/back` 是改绑到 `parent_id`。不需要“聚焦”这个单独的状态。
-- `@2 …`、引用回复是**只送这一条**，不改绑定；送达的会话就是被点名的那个，`origin` 记 `im`。
-- 收件规则只有一条：**chat 收到它绑定的会话的外发事件，以及这个会话所有后代的“需要你”事件（审批、提问）**。
-  worker 的汇报本来就是 coordinator 里的事件，所以绑 coordinator 的 chat 自然收到；绑 worker 的 chat 只收那一个线程的。
-- Web 项目页页头的“已绑定的 IM”，是绑在这个项目 coordinator 上的 chat；线程页同理显示绑在它自己上的。
+- 绑项目：`thread_id` 是它的主线程，**界面上选项目，后端解析成主线程**。
+- 绑文件夹：`thread_id` 是文件夹里的当前线程。`/new` 开新线程并把绑定移过去，旧线程留在文件夹里。
+- `/focus #2` 是改绑到子线程；`/back` 是改绑到 `parent_id`。不需要“聚焦”这个单独的状态。
+- `@2 …`、引用回复**只送这一条**，不改绑定。
+- 收件规则只有一条：**chat 收到它绑定的线程的外发事件，以及这个线程所有后代的“需要你”事件（审批、提问）**。
+  子线程的汇报本来就是主线程里的事件，所以绑主线程的 chat 自然收到。
+- Web 项目页页头的“已绑定的 IM”，是绑在这个项目主线程上的 chat；线程页同理显示绑在它自己上的。
 
 ### 地址和消息
 
-给任何会话发消息只有一个操作：`Send(session_id, text, origin)`。用户在 Web 发、IM 发、coordinator 给 worker 发、
-worker 向 coordinator 汇报，都是它，差别只在 `origin`。排队、暂停和归档检查、事件推送自然一致。
+给任何线程发消息只有一个操作：`Send(thread_id, text, source)`。用户在 Web 发、IM 发、主线程给子线程发、
+子线程向主线程汇报，都是它，差别只在 `source`。排队、暂停和归档检查、事件推送自然一致。
 
 ## 命名收拾
 
 | 现在 | 之后 | 原因 |
 |---|---|---|
-| `Thread` | `Session` | 唯一单位；“线程”只是 worker 的界面叫法 |
-| `Thread.Worktree` | `cwd` | 它在文件夹会话里根本不是 worktree，在 worker 里才是 |
-| `Thread.SessionID` | `engine_session_id` | 避免和 `Session` 撞名 |
-| `Thread.Origin` | `created_by` | `origin` 留给事件的来源 |
-| `ThreadEvent` + `ProjectMessage` | `session_events` | 同一种东西 |
-| `workdirs` 表、`Workdir` | `projects.kind=folder` + `path` | 不再有第二套身份 |
-| `<project>/worktrees/<thread>/` | `<project>/sessions/<id>/`（新会话）；旧会话的 `cwd` 不动 | 磁盘上的目录不搬，`cwd` 记全路径 |
-| `/projects/:id/threads`、`/projects/sessions`、`/projects/workdirs` | `/projects/sessions`（`?project_id=`、`?role=`） | 一套接口 |
-| `project_id == ""` 的 12 处判断 | `project.kind` 或 `session.role` | 判断依据是显式字段 |
+| `Thread.Worktree` | `cwd` | 在文件夹线程里它不是 worktree |
+| `ProjectMessage` + `ThreadEvent` | `thread_events` | 同一种东西 |
+| `ThreadEvent.From` | `source` 一组字段 | 来源是事件的属性 |
+| `workdirs` 表、`Workdir` | `projects.type=folder` + `path` | 不再有第二套身份 |
+| `project_id == ""` 的 12 处判断 | `project.type` 或 `thread.parent_id` | 判断依据是显式字段 |
+| `/projects/sessions`、`/projects/workdirs` | `GET /projects?type=folder`、`/projects/:id/threads` | 一套接口 |
+| 新线程的 `<project>/worktrees/<id>/` | `<project>/threads/<id>/`；旧线程的 `cwd` 不动 | 磁盘上的目录不搬，`cwd` 记全路径 |
 
-“工作目录”这个词和 worktree 太像，`kind` 用 `folder`，界面叫“文件夹”（代码里已经有 working folder 的说法）。
+`kind` 不用了，字段叫 `type`；`folder` 代替 `workdir`，避免和 worktree 混淆。
 
 ## 迁移（升级时一次，幂等）
 
-1. `projects` 加 `kind`（默认 `project`）、`path`；`threads` 加新列。
-2. `workdirs` 的每个路径、以及 `project_id` 为空的会话用到的每个 `worktree` 路径，各建一个 `kind=folder` 的项目
-   （名字取文件夹名；路径规范化后唯一）。把这些会话的 `project_id` 回填。
-3. 每个 `kind=project` 的项目建一个 coordinator 会话（`role=coordinator`，`agent=llm`，`cwd` 为项目目录）。
-4. `project_messages` → `session_events`：挂到该项目的 coordinator 会话，**保留 id 和 `created_at`**，`Source*` 映射成 `origin*`；
-   `thread_events` → `session_events`，`From` 映射成 `origin`。
-5. `threads` 重命名为 `sessions`：`Worktree`→`cwd`，`SessionID`→`engine_session_id`，`Origin`→`created_by`；
-   worker 填 `parent_id` 和 `role`；按创建顺序给每个项目回填 `seq`。
-6. `channel_bindings`：`project_id` + `focus_thread_id` 折成 `session_id`（有聚焦用线程，否则用该项目的 coordinator 会话）；
-   去掉 `target_kind`、`workdir_id`。
-7. 校验：会话总数 = 原线程数 + 项目数；事件总数 = 原两表之和；每个会话都有归属；`engine_session_id` 一个不丢。
+1. `projects` 加 `type`（默认 `project`）、`path`、`main_thread_id`；`threads` 加 `parent_id`、`seq`、`agent`，`worktree` 改名 `cwd`；
+   `thread_events` 加 `source`、`source_ref`、`source_platform`、`source_chat_id`。
+2. `workdirs` 的每个路径、以及 `project_id` 为空的线程用到的每个 `cwd`，各建一个 `type=folder` 的项目
+   （名字取文件夹名；路径规范化后唯一），回填这些线程的 `project_id`。
+3. 每个 `type=project` 的项目建一个主线程（`agent=llm`，`cwd` 为项目目录），写入 `main_thread_id`；该项目原有线程的 `parent_id` 指向它。
+4. `project_messages` → `thread_events`：挂到主线程，**保留 id 和 `created_at`**，`Source*` 原样映射；
+   原 `thread_events.from` 映射成 `source`（`coordinator` → `thread` + 主线程 id，`user` → 空）。
+5. 按创建顺序给每个项目的线程回填 `seq`。
+6. `channel_bindings`：`project_id` + `focus_thread_id` 折成 `thread_id`（有聚焦用它，否则用项目的主线程）；去掉 `target_kind`、`workdir_id`。
+7. 校验：线程总数 = 原线程数 + 项目数；事件总数 = 原两表之和；每个线程都有项目；`session_id` 一个不丢。
    任何一项不符就**不提交**，保持旧库不变并报错。
-8. 旧表保留一个版本，只读不写，下个版本删除。
+8. 旧表（`project_messages`、`workdirs`）保留一个版本，只读不写，下个版本删除。
 
 不动的东西：磁盘上的 worktree、Claude Code 的会话文件、附件。迁移在服务启动、运行时起来之前做，不会碰到正在跑的会话。
 
 ## 影响面
 
-- **后端**：`projects/internal/db`、`project`（threads/sessions/coordinator/transcript/attachment/channels）、
-  `server/module` 的 handler；Coordinator 的消息读写换成事件；`Relay`、`ChatBridge` 改按会话路由。
-- **前端**：`@tingly/projects` 里 Thread 相关的类型、页面、hooks 改名；项目页和文件夹页共用布局，按 `kind` 隐藏项目才有的区块；
-  侧栏两组按 `kind` 过滤同一个列表，等待信号合成一份。
-- **IM**：绑定页和绑定弹窗列“项目”和“文件夹”，选中后后端解析成会话。
-- **API**：这是一次破坏性改名。没有大批量推广，独立版 Projects 的外部使用者很少，所以**不做兼容别名**，只在发布说明里写。
-  （见“需要拍板”。）
+- **后端**：`projects/internal/db`、`project` 包（threads/sessions/coordinator/transcript/attachment/channels）、`server/module` 的 handler；
+  Coordinator 的消息读写换成主线程的事件；`Relay`、`ChatBridge` 按线程路由；M1 的绑定接口改收 `thread_id`（仍可传 `project_id`，由服务解析为主线程）。
+- **前端**：`@tingly/projects` 里文件夹会话和工作目录相关的类型、页面、hooks 并入项目和线程；项目页和文件夹页共用布局，按 `type` 隐藏项目才有的区块；
+  侧栏两组按 `type` 过滤同一个列表，等待信号合成一份。
+- **API**：必要的破坏，不做兼容别名，发布说明里写明。保留 `/projects/:id/threads` 这条主路径，所以线程相关的前端改动少。
 
-## 里程碑（替换 projects-im.md 里的 M2a/M2b）
+## 交付
 
-| | 内容 | 说明 |
-|---|---|---|
-| **S1 数据模型** | `sessions`、`session_events`、`kind`/`path`、coordinator 会话、迁移和校验、旧库快照测试；`project` 包按新模型读写 | 先保持 HTTP 的路径和 JSON 形状不变（handler 里做映射），前端不动，PR 可独立合并 |
-| **S2 接口与前端** | 接口收敛成 `/projects/sessions`，删除映射；前端改名、侧栏按 `kind`、项目页与文件夹页合并；`task codegen` | 破坏性改动都在这一步 |
-| **M2b 文件夹绑定** | 绑定改为 `session_id`；绑文件夹、`/new`、`/stop`；弹窗列两类 | 取代原 M2b |
-| M3 | 审批与提问进 IM（收件规则已定） | 不变 |
-| M4 | `@N`、引用回复、`/threads`、`/focus`（= 改绑）、`/back`（= 绑到父） | `seq` 已在 S1 落地 |
-| M5 | 未绑定走 coordinator；删 Remote 页面、SmartGuide、`remote/session`；旧绑定转换 | 不变 |
-| M6 | coordinator 路由（`@opus`、`@codex`） | `agent` 字段是它的落点 |
+一次变更，两个 PR 叠放，一起合：
+1. **后端**：模型、迁移与校验、旧库快照测试、`project` 包和 HTTP 接口、`task codegen`。
+2. **前端**：基于 1 的生成客户端，页面、侧栏、绑定弹窗。
 
-S1 是风险最集中的一步（迁移），所以单独成 PR、带快照测试，并且不改任何外部行为。
+之后才是 IM 行为：M2b（文件夹绑定、`/new`、`/stop`）、M3 审批、M4 `@N`/`/focus`/`/back`、M5 收尾、M6 路由。
 
 ## 风险
 
-- **迁移写错会让对话消失**：事件总数、会话总数和归属的校验必须在提交前跑，测试用一份带文件夹会话、旧绑定和 coordinator 对话的旧库快照。
-- **coordinator 消息的形状**：`ProjectMessage.role` 和 `kind` 要无损映射到事件；`Payload` 原样保留，渲染端按 `kind` 取，不依赖表。
+- **迁移写错会让对话消失**：校验必须在提交前跑；测试用一份带文件夹会话、旧绑定和 coordinator 对话的旧库快照。
+- **coordinator 消息的形状**：`role` 和 `kind` 要无损映射到事件；`payload` 原样保留。
 - **路径重复**：大小写、末尾斜杠、软链接不一致会产生重复的文件夹项目；入库前统一规范化，唯一索引兜底。
-- **事件表变大**：两张表合一，按 `session_id` 建索引；本地 SQLite 的量级可以接受。
-- **M1 已合并的绑定接口**：`PUT /channel-bindings` 目前收 `project_id`。S1 里继续接受它（解析成 coordinator 会话），
-  响应多一个 `session_id`；S2 再把请求改成 `session_id`。前端 #2146 因此不用跟着改。
+- **事件表变大**：两张表合一，按 `thread_id` 建索引；本地 SQLite 的量级可以接受。
 
 ## 现在不做，但模型留了口子
 
-- 独立聊天（`Conversation`/`Message`）也是一次与 agent 的交互，将来可以落成 `role=solo`、`agent=llm` 的会话。
-  这次不并，避免范围失控；并的时候不需要新表。
-- 会话间的 peer 消息（worker 之间直接对话）：`Send` 和 `origin=session` 已经能表达，不开放。
+- 独立聊天（`Conversation`/`Message`）也是一次与 agent 的交互，将来可以落成 `agent=llm` 的线程，不需要新表。
+- 线程之间的 peer 消息：`Send` 和 `source=thread` 已经能表达，不开放。
 - 其他 agent（codex 等）：`agent` 字段。
 
-## 需要拍板
+## 已定
 
-1. **界面叫法**：worker 叫“线程”、solo 叫“会话”、coordinator 叫“项目对话”，由 `role` 决定（建议）。还是全部叫“会话”？
-2. **`kind` 的名字**：`folder`（建议，避开和 worktree 的相似）还是沿用 `workdir`？
-3. **API 不做兼容别名**（建议，推广前破坏一次）。还是保留旧路径一个版本？
-4. **文件夹的“移除”**：只归档项目、会话保留（建议，和现在一致）。
-5. **S1 先不动 HTTP 形状、S2 再改**（建议，PR 小、可回退）。还是 S1 和 S2 一起？
+- 名字沿用 Thread，不引入 role；界面：主线程“项目对话”，其余“线程”。
+- 字段叫 `type`，取值 `project | folder`。
+- API 不做兼容，接受必要的破坏。
+- 文件夹“移除”一律只归档，会话保留。
+- 设计、模式、迁移和变更这一版一次完成。

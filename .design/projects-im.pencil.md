@@ -10,8 +10,8 @@ Contents:
 - What a chat binds to
 - Inbound: from a message to a thread
 - Outbound: from thread events to chats
-- One entity, two kinds (superseded by Sessions)
-- Sessions: one unit, role and parent as attributes
+- One entity, two kinds (superseded by Threads)
+- Threads as the unit: parent and agent are attributes
 - Migration: what happens to existing folder sessions
 - Addressing a thread from a project-bound chat
 - Approval with two surfaces open
@@ -115,7 +115,7 @@ coordinator thread_update  ──▶  one folded line in IM ("2 thread updates")
 approval / ask             ──▶  an interactive message (buttons) in every bound chat
 ```
 
-## One entity, two kinds (superseded: see Sessions below)
+## One entity, two kinds (superseded: see Threads as the unit below)
 
 ```
 TODAY                                              AFTER (M2a)
@@ -283,28 +283,28 @@ M1 deliberately leaves out: folder binding, approvals in IM (IM gets one line "a
 thread addressing, removing the old path.
 ```
 
-## Sessions
+## Threads as the unit
 
 ```
-Claude Code today                          Ours after S1
-─────────────────                          ─────────────
-session  (sessionId, one transcript)       Session   (id, one event stream)
- └ subagent = its own transcript             ├ coordinator   parent = none     agent = llm
-     agentId · spawnDepth · toolUseId        ├ worker        parent = coordinator   branch + cwd
-     own worktree + branch                   └ solo          in a folder, no parent
-message.origin = human | peer | task-…     Event.origin = web | im | session | system
+Claude Code today                          Ours
+─────────────────                          ────
+session  (sessionId, one transcript)       Thread    (id, one event stream)
+ └ subagent = its own transcript             ├ main thread   parent = none     agent = llm
+     agentId · spawnDepth · toolUseId        ├ child thread  parent = main     branch + cwd
+     own worktree + branch                   └ folder thread in a folder, no parent
+message.origin = human | peer | task-…     Event.source = web | im | thread | system
 session.entrypoint = remote_projects         (channel is a property of the event)
 
-Project (shared context)  kind = project | folder
-  project ── coordinator ── worker, worker, ...
-  folder  ── solo, solo, ...
+Project (shared context)  type = project | folder
+  project ── main thread ── child, child, ...
+  folder  ── thread, thread, ...
 
-ChannelBinding(platform, chat_id) ──▶ session_id
-  bind a project   → its coordinator session
-  bind a folder    → current solo session        /new  → new session, move binding
-  /focus #2        → rebind to worker 2          /back → rebind to parent_id
+ChannelBinding(platform, chat_id) ──▶ thread_id
+  bind a project   → its main thread
+  bind a folder    → current thread              /new  → new thread, move binding
+  /focus #2        → rebind to thread 2          /back → rebind to parent_id
   @2 … / quote     → send one message to #2, binding unchanged
 
-who a chat hears:  its session's events + "needs you" events of all descendants
-Send(session_id, text, origin)  is the only way to talk to a session
+who a chat hears:  its thread's events + "needs you" events of all descendants
+Send(thread_id, text, source)  is the only way to talk to a thread
 ```
