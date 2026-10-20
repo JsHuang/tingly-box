@@ -1153,9 +1153,10 @@ wait:
 			delete(p.pending, payload.RequestID)
 			p.mu.Unlock()
 			if !still {
-				// The user answered at the same moment: theirs wins.
-				ans = <-pd.ch
-				break wait
+				// Answered at the same moment (theirs wins), or the turn is
+				// being cancelled: wait for whichever lands.
+				fire = nil
+				continue
 			}
 			ans = Answer{Allow: true, Answers: suggested}
 			payload.Auto = true
