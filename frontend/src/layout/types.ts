@@ -60,11 +60,6 @@ export interface ActivityItem {
     // Default path to use when there's no saved path in memory
     defaultPath?: string;
     /**
-     * 'bottom' docks the rail icon at the foot of the rail, above the
-     * preferences button, instead of in the scrolling list.
-     */
-    dock?: 'bottom';
-    /**
      * Not a rail icon: the activity is opened from elsewhere (System, from the
      * gear at the foot of the rail) but still owns its sidebar and lights up
      * its pages' routes.
