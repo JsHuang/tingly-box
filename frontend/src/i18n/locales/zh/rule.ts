@@ -280,7 +280,21 @@ export default {
       "unconditional": "无条件，跳过"
     }
   },
+  "ruleAutoSave": {
+    "saved": "配置已保存",
+    "failed": "保存失败：{{error}}",
+    "unknownError": "未知错误",
+    "error": "保存配置出错"
+  },
   "ruleHeader": {
+    "context1M": {
+      "tooltip": "选择此规则是否添加 1M 上下文",
+      "label": "1M 上下文",
+      "on": "开",
+      "off": "关",
+      "onHint": "为此规则添加 1M；上游模型必须支持。",
+      "offHint": "此规则不添加 1M；客户端主动请求 1M 时，在支持的情况下仍然有效。"
+    },
     "plugins": "插件",
     "pluginsTooltip": "此规则已启用的插件",
     "endpointNotApplicable": "只对 OpenAI 兼容上游生效。此规则目前没有这类上游，所以选择暂时不起作用。",

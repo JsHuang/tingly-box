@@ -280,7 +280,21 @@ export default {
       "unconditional": "Unconditional, ignore"
     }
   },
+  "ruleAutoSave": {
+    "saved": "Configuration saved successfully",
+    "failed": "Failed to save: {{error}}",
+    "unknownError": "Unknown error",
+    "error": "Error saving configuration"
+  },
   "ruleHeader": {
+    "context1M": {
+      "tooltip": "Choose whether this rule adds 1M context",
+      "label": "1M context",
+      "on": "On",
+      "off": "Off",
+      "onHint": "Add 1M for this rule. The upstream model must support it.",
+      "offHint": "Do not add 1M for this rule. Client-requested 1M still works where supported."
+    },
     "plugins": "Plugins",
     "pluginsTooltip": "Plugins enabled on this rule",
     "endpointNotApplicable": "Only applies to OpenAI-compatible upstreams. This rule has none, so the choice has no effect for now.",
