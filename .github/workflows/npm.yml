@@ -1,25 +1,19 @@
 name: NPX Package Publish from GitHub Release
 
 run-name: >-
-  📦 NPX publish ${{ github.event.inputs.tag || github.event.release.tag_name }}
+  📦 NPX publish ${{ github.event.inputs.tag }}
   → npm:${{ github.event.inputs.npm_tag || 'auto' }}
   [cli=${{ github.event.inputs.publish_cli || 'true' }},
   gui=${{ github.event.inputs.publish_gui || 'false' }},
   docker=${{ github.event.inputs.build_docker || 'true' }}]
   by @${{ github.actor }}
 
-# Triggers:
-#   - release: published — fires only for releases created by a person or an
-#     app token. Releases cut by release-cli.yml and release-gui.yml use GITHUB_TOKEN, and GitHub does
-#     not start workflow runs for events created with that token. Tag pushes
-#     and manual releases reach this workflow via the `trigger-npm-publish`
-#     jobs in those workflows, which dispatch it with the inputs below (npm_tag
-#     inferred from the version). Either way the run parks at the `production`
-#     environment approval before anything is published.
-#   - workflow_dispatch — manual (re-)publish against any existing release.
+# Trigger: workflow_dispatch only. A release never publishes by itself:
+# release-cli.yml and release-gui.yml leave a note in their job summary with
+# suggested inputs, and the releaser runs this workflow, picking tag, npm
+# dist-tag and which packages to publish. The run then parks at the
+# `production` environment approval before anything is published.
 on:
-  release:
-    types: [published]
   workflow_dispatch:
     inputs:
       tag:
@@ -27,7 +21,7 @@ on:
         required: true
         type: string
       npm_tag:
-        description: 'npm dist-tag for publish (latest/rc). Auto-trigger infers from version: stable→latest, pre-release→rc'
+        description: 'npm dist-tag for publish (latest/rc). Use latest for a stable release, rc for a pre-release'
         required: false
         type: choice
         options:
@@ -82,34 +76,15 @@ jobs:
       - name: Set variables
         id: set_vars
         run: |
-          if [ "${{ github.event_name }}" = "release" ]; then
-            echo "publish_cli=true" >> $GITHUB_OUTPUT
-            echo "publish_gui=false" >> $GITHUB_OUTPUT
-            echo "build_docker=true" >> $GITHUB_OUTPUT
-            # Auto-infer npm tag from version: stable → latest, pre-release → rc
-            RELEASE_TAG="${{ github.event.release.tag_name }}"
-            VERSION="${RELEASE_TAG#v}"
-            if [[ "$VERSION" == *-* ]]; then
-              echo "npm_tag=rc" >> $GITHUB_OUTPUT
-            else
-              echo "npm_tag=latest" >> $GITHUB_OUTPUT
-            fi
-          else
-            # workflow_dispatch: tag must be provided explicitly
-            echo "publish_cli=${{ github.event.inputs.publish_cli }}" >> $GITHUB_OUTPUT
-            echo "publish_gui=${{ github.event.inputs.publish_gui }}" >> $GITHUB_OUTPUT
-            echo "build_docker=${{ github.event.inputs.build_docker }}" >> $GITHUB_OUTPUT
-            echo "npm_tag=${{ github.event.inputs.npm_tag }}" >> $GITHUB_OUTPUT
-          fi
+          echo "publish_cli=${{ github.event.inputs.publish_cli }}" >> $GITHUB_OUTPUT
+          echo "publish_gui=${{ github.event.inputs.publish_gui }}" >> $GITHUB_OUTPUT
+          echo "build_docker=${{ github.event.inputs.build_docker }}" >> $GITHUB_OUTPUT
+          echo "npm_tag=${{ github.event.inputs.npm_tag }}" >> $GITHUB_OUTPUT
 
       - name: Validate and extract version
         id: version
         run: |
-          if [ "${{ github.event_name }}" = "release" ]; then
-            RELEASE_TAG="${{ github.event.release.tag_name }}"
-          else
-            RELEASE_TAG="${{ github.event.inputs.tag }}"
-          fi
+          RELEASE_TAG="${{ github.event.inputs.tag }}"
 
           # Validate tag format
           if [[ ! "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9]+)?$ ]]; then
