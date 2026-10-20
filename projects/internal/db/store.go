@@ -41,7 +41,9 @@ func Open(path string, opts ...Option) (*Store, error) {
 	for _, opt := range opts {
 		opt(&o)
 	}
-	if path != ":memory:" {
+	inMemory := path == ":memory:" || path == "" || strings.HasPrefix(path, "file::memory:")
+	dbPath := path
+	if !inMemory {
 		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 			return nil, fmt.Errorf("create data dir: %w", err)
 		}
@@ -51,13 +53,21 @@ func Open(path string, opts ...Option) (*Store, error) {
 	if err != nil {
 		return nil, fmt.Errorf("open database: %w", err)
 	}
-	if path == ":memory:" {
+	if inMemory {
 		// Each new connection to :memory: is a fresh database; pin to one.
 		sqlDB, err := g.DB()
 		if err != nil {
 			return nil, err
 		}
 		sqlDB.SetMaxOpenConns(1)
+	}
+	if !inMemory {
+		if err := backupBeforeMigration(g, dbPath); err != nil {
+			if sqlDB, e := g.DB(); e == nil {
+				sqlDB.Close()
+			}
+			return nil, err
+		}
 	}
 	if err := migrate(g, o); err != nil {
 		if sqlDB, e := g.DB(); e == nil {

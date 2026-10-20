@@ -2,6 +2,7 @@ package db
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"runtime"
 	"sort"
@@ -72,7 +73,12 @@ type legacyMessage struct {
 	CreatedAt      time.Time
 }
 
-type threadSnapshot struct{ ID, ProjectID, SessionID string }
+// threadSnapshot is a thread as it was before the move. Owned is false when
+// its project_id pointed at a project that did not exist.
+type threadSnapshot struct {
+	ID, ProjectID, SessionID string
+	Owned                    bool
+}
 
 type legacyWorkdir struct {
 	Path       string
@@ -176,14 +182,22 @@ func count(tx *gorm.DB, query string, args ...any) int64 {
 func migrateData(tx *gorm.DB, o openOptions, oldBindings []legacyBinding) error {
 	m := tx.Migrator()
 	var before []threadSnapshot
-	if err := tx.Raw("SELECT id, project_id, COALESCE(session_id,'') session_id FROM threads").Scan(&before).Error; err != nil {
+	if err := tx.Raw(`SELECT id, project_id, COALESCE(session_id,'') session_id,
+		project_id IN (SELECT id FROM projects) AS owned FROM threads`).Scan(&before).Error; err != nil {
 		return err
 	}
 	threadsBefore, eventsBefore := int64(len(before)), count(tx, "SELECT COUNT(*) FROM thread_events")
+	bindingsBefore := count(tx, "SELECT COUNT(*) FROM channel_bindings")
 
 	// 2. Folder projects, from workdirs and from threads without a project.
 	if err := migrateFolders(tx); err != nil {
 		return fmt.Errorf("folders: %w", err)
+	}
+
+	// A thread whose project is gone would fail verification forever, so it is
+	// adopted by a recovered folder project instead.
+	if err := recoverOrphanThreads(tx, o); err != nil {
+		return fmt.Errorf("recover threads of missing projects: %w", err)
 	}
 
 	// 3. A main thread for every project; its other threads become children.
@@ -284,10 +298,11 @@ func migrateData(tx *gorm.DB, o openOptions, oldBindings []legacyBinding) error 
 	}
 
 	// 7. Verify before committing.
-	return verifyMigration(tx, before, threadsBefore, eventsBefore, int64(len(needMain)), moved)
+	return verifyMigration(tx, before, threadsBefore, eventsBefore, int64(len(needMain)), moved,
+		bindingsBefore, int64(len(oldBindings)), int64(dropped))
 }
 
-func verifyMigration(tx *gorm.DB, before []threadSnapshot, threadsBefore, eventsBefore, mains, moved int64) error {
+func verifyMigration(tx *gorm.DB, before []threadSnapshot, threadsBefore, eventsBefore, mains, moved, bindingsBefore, bindingsOld, bindingsDropped int64) error {
 	fail := func(format string, a ...any) error {
 		return fmt.Errorf("projects migration verification failed, database left unchanged: "+format, a...)
 	}
@@ -296,6 +311,9 @@ func verifyMigration(tx *gorm.DB, before []threadSnapshot, threadsBefore, events
 	}
 	if n := count(tx, "SELECT COUNT(*) FROM thread_events"); n != eventsBefore+moved {
 		return fail("events: %d, want %d existing + %d moved", n, eventsBefore, moved)
+	}
+	if n := count(tx, "SELECT COUNT(*) FROM channel_bindings"); n+bindingsDropped != bindingsBefore+bindingsOld {
+		return fail("bindings: %d migrated + %d dropped, want %d old", n-bindingsBefore, bindingsDropped, bindingsOld)
 	}
 	if n := count(tx, "SELECT COUNT(*) FROM threads WHERE project_id = '' OR project_id NOT IN (SELECT id FROM projects)"); n > 0 {
 		return fail("%d thread(s) without a project", n)
@@ -322,7 +340,7 @@ func verifyMigration(tx *gorm.DB, before []threadSnapshot, threadsBefore, events
 		if after.SessionID != b.SessionID {
 			return fail("session_id of thread %s changed", b.ID)
 		}
-		if b.ProjectID != "" && after.ProjectID != b.ProjectID {
+		if b.Owned && after.ProjectID != b.ProjectID {
 			return fail("thread %s changed project", b.ID)
 		}
 	}
@@ -432,7 +450,9 @@ func migrateMessages(tx *gorm.DB) (int64, error) {
 	for _, m := range msgs {
 		main, ok := mains[m.ProjectID]
 		if !ok {
-			tx.Raw("SELECT main_thread_id FROM projects WHERE id = ?", m.ProjectID).Scan(&main)
+			if err := tx.Raw("SELECT main_thread_id FROM projects WHERE id = ?", m.ProjectID).Scan(&main).Error; err != nil {
+				return 0, err
+			}
 			mains[m.ProjectID] = main
 		}
 		if main == "" {
@@ -455,4 +475,114 @@ func migrateMessages(tx *gorm.DB) (int64, error) {
 		moved++
 	}
 	return moved, nil
+}
+
+// recoverOrphanThreads gives the threads of a project that no longer exists a
+// folder project to live in, one per missing project id: the folder they all
+// ran in when they share one (reusing its folder project if there is one),
+// else a synthetic, stable path. The project is named "(recovered) ...", so the
+// user can see what happened and archive it.
+func recoverOrphanThreads(tx *gorm.DB, o openOptions) error {
+	var ts []struct {
+		ID        string
+		ProjectID string
+		Cwd       string
+		CreatedAt time.Time
+		UpdatedAt time.Time
+	}
+	if err := tx.Raw(`SELECT id, project_id, COALESCE(cwd,'') cwd, created_at, updated_at FROM threads
+		WHERE project_id <> '' AND project_id NOT IN (SELECT id FROM projects) ORDER BY created_at, rowid`).Scan(&ts).Error; err != nil {
+		return err
+	}
+	if len(ts) == 0 {
+		return nil
+	}
+	byGhost := map[string][]int{}
+	var ghosts []string
+	for i, t := range ts {
+		if _, ok := byGhost[t.ProjectID]; !ok {
+			ghosts = append(ghosts, t.ProjectID)
+		}
+		byGhost[t.ProjectID] = append(byGhost[t.ProjectID], i)
+	}
+	sort.Strings(ghosts)
+	for _, ghost := range ghosts {
+		idx := byGhost[ghost]
+		shared := PathKey(ts[idx[0]].Cwd)
+		for _, i := range idx {
+			if PathKey(ts[i].Cwd) != shared {
+				shared = ""
+				break
+			}
+		}
+		created, used := ts[idx[0]].CreatedAt, ts[idx[0]].UpdatedAt
+		for _, i := range idx {
+			if ts[i].CreatedAt.Before(created) {
+				created = ts[i].CreatedAt
+			}
+			if ts[i].UpdatedAt.After(used) {
+				used = ts[i].UpdatedAt
+			}
+		}
+		var pid string
+		path := CanonicalPath(ts[idx[0]].Cwd)
+		if shared == "" {
+			path = filepath.Join(o.projectsDir, "recovered", ghost)
+		}
+		var existing []Project
+		if err := tx.Where("type = ?", ProjectFolder).Find(&existing).Error; err != nil {
+			return err
+		}
+		for _, p := range existing {
+			if PathKey(p.Path) == PathKey(path) {
+				pid = p.ID
+			}
+		}
+		if pid == "" {
+			name := "(recovered) " + FolderName(path)
+			if shared == "" {
+				name = "(recovered) " + ghost
+			}
+			p := Project{ID: uuid.NewString(), Type: ProjectFolder, Path: path, Name: name, CreatedAt: created, UpdatedAt: used}
+			if err := tx.Create(&p).Error; err != nil {
+				return err
+			}
+			pid = p.ID
+		}
+		if err := tx.Exec("UPDATE threads SET project_id = ? WHERE project_id = ?", pid, ghost).Error; err != nil {
+			return err
+		}
+		logrus.Warnf("projects: %d thread(s) belonged to project %s, which no longer exists; moved to folder project %q", len(idx), ghost, path)
+	}
+	return nil
+}
+
+// BackupSuffix is appended to the database path for the copy made before the
+// first migration to the unified Thread model.
+const BackupSuffix = ".pre-unified-threads"
+
+// backupBeforeMigration copies an existing, not yet migrated database to
+// <path>.pre-unified-threads, once. The copy is a consistent snapshot (VACUUM
+// INTO, so the WAL is included). An existing backup is never overwritten.
+func backupBeforeMigration(g *gorm.DB, path string) error {
+	m := g.Migrator()
+	if !m.HasTable("projects") && !m.HasTable("threads") {
+		return nil // new or empty file: nothing to protect
+	}
+	if m.HasTable("settings") {
+		var n int64
+		if err := g.Raw("SELECT COUNT(*) FROM settings WHERE key = ?", migrationMarker).Scan(&n).Error; err == nil && n > 0 {
+			return nil // already migrated
+		}
+	}
+	dst := path + BackupSuffix
+	if _, err := os.Stat(dst); err == nil {
+		return nil
+	}
+	if err := g.Exec("VACUUM INTO ?", dst).Error; err != nil {
+		os.Remove(dst)
+		return fmt.Errorf("back up database before migrating: %w", err)
+	}
+	logrus.Infof("projects: copied the database to %s before migrating it", dst)
+	return nil
 }

@@ -411,9 +411,11 @@ func TestMigrationIsIdempotent(t *testing.T) {
 
 func TestMigrationThatCannotBeVerifiedLeavesTheOldDatabase(t *testing.T) {
 	f := buildOldDB(t)
-	// A thread whose project does not exist cannot be owned by anyone.
+	// A trigger stands in for any bug that makes the migration lose data: it
+	// blanks a session id when the migration creates a project's main thread.
 	g := rawOpen(t, f.path)
-	require.NoError(t, g.Create(&oldThread{ID: "lost", ProjectID: "ghost", Status: "idle", Worktree: "/x", SessionID: "sl", CreatedAt: at(70), UpdatedAt: at(70)}).Error)
+	require.NoError(t, g.Exec(`CREATE TRIGGER lose_session AFTER INSERT ON threads WHEN NEW.title = 'Alpha'
+		BEGIN UPDATE threads SET session_id = '' WHERE id = 't1'; END`).Error)
 	closeRaw(t, g)
 
 	s, err := Open(f.path)
@@ -429,10 +431,105 @@ func TestMigrationThatCannotBeVerifiedLeavesTheOldDatabase(t *testing.T) {
 	assert.False(t, m.HasColumn("threads", "cwd"))
 	assert.False(t, m.HasColumn("projects", "main_thread_id"))
 	assert.True(t, m.HasColumn("channel_bindings", "target_kind"))
-	assert.EqualValues(t, f.threads+1, rawCount(t, g, "SELECT COUNT(*) FROM threads"))
+	assert.EqualValues(t, f.threads, rawCount(t, g, "SELECT COUNT(*) FROM threads"))
 	assert.EqualValues(t, f.messages, rawCount(t, g, "SELECT COUNT(*) FROM project_messages"))
 	assert.EqualValues(t, 3, rawCount(t, g, "SELECT COUNT(*) FROM channel_bindings"))
 	assert.EqualValues(t, f.events, rawCount(t, g, "SELECT COUNT(*) FROM thread_events"))
+}
+
+func TestMigrationRecoversThreadsOfAMissingProject(t *testing.T) {
+	f := buildOldDB(t)
+	shared := filepath.Join(filepath.Dir(f.path), "shared")
+	require.NoError(t, os.MkdirAll(shared, 0o755))
+	g := rawOpen(t, f.path)
+	create := func(v any) { require.NoError(t, g.Create(v).Error) }
+	// Two threads of a deleted project that ran in one folder, one in a third
+	// place, and one of another deleted project that ran in folder A (which
+	// already has a folder project).
+	create(&oldThread{ID: "g1", ProjectID: "ghost", Status: "idle", Worktree: shared, SessionID: "sg1", CreatedAt: at(70), UpdatedAt: at(71)})
+	create(&oldThread{ID: "g2", ProjectID: "ghost", Status: "idle", Worktree: shared, SessionID: "sg2", CreatedAt: at(72), UpdatedAt: at(73)})
+	create(&oldThread{ID: "h1", ProjectID: "ghost2", Status: "idle", Worktree: "/x/one", SessionID: "sh1", CreatedAt: at(74), UpdatedAt: at(75)})
+	create(&oldThread{ID: "h2", ProjectID: "ghost2", Status: "idle", Worktree: "/x/two", SessionID: "sh2", CreatedAt: at(76), UpdatedAt: at(77)})
+	create(&oldThread{ID: "k1", ProjectID: "ghost3", Status: "idle", Worktree: f.folderA, SessionID: "sk1", CreatedAt: at(78), UpdatedAt: at(79)})
+	closeRaw(t, g)
+
+	s, err := Open(f.path, WithProjectsDir("/data"))
+	require.NoError(t, err, "a missing project must not stop startup")
+	defer s.Close()
+
+	owner := func(id string) Project {
+		th := mustThread(t, s, id)
+		p, err := s.GetProject(th.ProjectID)
+		require.NoError(t, err)
+		return *p
+	}
+	g1, g2, h1, h2, k1 := owner("g1"), owner("g2"), owner("h1"), owner("h2"), owner("k1")
+	assert.Equal(t, ProjectFolder, g1.Type)
+	assert.Equal(t, g1.ID, g2.ID, "threads of one missing project share a project")
+	assert.Equal(t, CanonicalPath(shared), g1.Path, "the folder they all ran in")
+	assert.Contains(t, g1.Name, "(recovered)")
+	assert.Equal(t, h1.ID, h2.ID)
+	assert.Equal(t, filepath.Join("/data", "recovered", "ghost2"), h1.Path, "no common folder: a stable synthetic path")
+	assert.Contains(t, h1.Name, "(recovered)")
+	assert.NotContains(t, k1.Name, "(recovered)", "an existing folder project is reused")
+	assert.Equal(t, CanonicalPath(f.folderA), k1.Path)
+	assert.Equal(t, "sg1", mustThread(t, s, "g1").SessionID)
+}
+
+func TestMigrationBacksUpTheOldDatabaseOnce(t *testing.T) {
+	f := buildOldDB(t)
+	backup := f.path + BackupSuffix
+	_, err := os.Stat(backup)
+	require.True(t, os.IsNotExist(err))
+
+	s, err := Open(f.path)
+	require.NoError(t, err)
+	require.NoError(t, s.Close())
+
+	// The copy is the old database, readable as it was.
+	g := rawOpen(t, backup)
+	assert.True(t, g.Migrator().HasColumn("threads", "worktree"))
+	assert.EqualValues(t, f.threads, rawCount(t, g, "SELECT COUNT(*) FROM threads"))
+	closeRaw(t, g)
+
+	// Later starts leave it alone, even if it is changed or the marker is gone.
+	require.NoError(t, os.WriteFile(backup, []byte("mine"), 0o644))
+	s, err = Open(f.path)
+	require.NoError(t, err)
+	require.NoError(t, s.Close())
+	b, err := os.ReadFile(backup)
+	require.NoError(t, err)
+	assert.Equal(t, "mine", string(b), "an existing backup is never overwritten")
+}
+
+func TestFreshDatabaseIsNotBackedUp(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "fresh.db")
+	s, err := Open(path)
+	require.NoError(t, err)
+	require.NoError(t, s.Close())
+	_, err = os.Stat(path + BackupSuffix)
+	assert.True(t, os.IsNotExist(err))
+	s, err = Open(path)
+	require.NoError(t, err)
+	require.NoError(t, s.Close())
+	_, err = os.Stat(path + BackupSuffix)
+	assert.True(t, os.IsNotExist(err))
+}
+
+func TestMigrationVerifiesBindingCounts(t *testing.T) {
+	// A bug that loses a migrated binding must fail the migration rather than
+	// drop it silently.
+	tx := rawOpen(t, ":memory:")
+	defer closeRaw(t, tx)
+	require.NoError(t, tx.AutoMigrate(&Project{}, &Thread{}, &ThreadEvent{}, &ChannelBinding{}))
+	require.NoError(t, tx.Create(&ChannelBinding{ID: "x", Platform: "p", ChatID: "c", ThreadID: "t"}).Error)
+
+	// migrated(1) + dropped(0) != old(2): a binding vanished.
+	err := verifyMigration(tx, nil, 0, 0, 0, 0, 0, 2, 0)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "bindings")
+	// One dropped on purpose balances it.
+	assert.NoError(t, verifyMigration(tx, nil, 0, 0, 0, 0, 0, 2, 1))
 }
 
 func TestFreshDatabaseNeedsNoMigration(t *testing.T) {
