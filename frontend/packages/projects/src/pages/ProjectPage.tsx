@@ -6,6 +6,7 @@ import { api, unwrap, type Project, type ProjectMessage, type Thread, type Threa
 import { ConversationPane } from '../components/project/ConversationPane';
 import { OverviewPane } from '../components/project/OverviewPane';
 import { ProjectSettingsDialog, type SettingsTab } from '../components/project/ProjectSettingsDialog';
+import { ProjectImTags, useProjectIm } from '../components/im/ProjectImBindings';
 import { ThreadPanel } from '../components/project/ThreadPanel';
 import { FloatingWindow } from '../components/workspace/FloatingWindow';
 import { OverviewBand } from '../components/workspace/OverviewBand';
@@ -43,6 +44,8 @@ export default function ProjectPage() {
     const [error, setError] = useState<string | null>(null);
     const [threadEvents, setThreadEvents] = useState<ThreadEvent[] | null>(null);
     const pane = useWorkspacePane();
+    // IM chats bound to this project (null when the host has no IM).
+    const im = useProjectIm(project);
     const placement = usePlacement();
     // The Overview as a window or a band opens and closes with the header button; remembered per browser.
     const [windowOpen, setWindowOpen] = useState(() => readLocal('overviewWindowOpen') !== '0');
@@ -258,6 +261,8 @@ export default function ProjectPage() {
                 ) : <Skeleton width={200} />}
                 actions={project && (
                     <>
+                        {/* Wide screens keep the bound chats in the header; narrow ones get their own row below it. */}
+                        {im && <Box sx={{ display: { xs: 'none', md: 'flex' }, minWidth: 0, flexShrink: 1 }}><ProjectImTags im={im} /></Box>}
                         {canPlace && <PlacementMenu overview={placement.overview} thread={placement.thread} onOverview={placement.setOverview} onThread={placement.setThread} overviewFloat={placement.overviewFloat} onOverviewFloat={placement.setOverviewFloat} />}
                         <Tooltip title={project.starred ? t('common.unstar') : t('common.star')}>
                             <IconButton size="small" onClick={() => void patch({ starred: !project.starred })}>{project.starred ? <Star fontSize="small" color="primary" /> : <StarBorder fontSize="small" />}</IconButton>
@@ -266,6 +271,11 @@ export default function ProjectPage() {
                             <IconButton size="small" onClick={() => setSettingsTab('general')} aria-label={t('projectSettings.title')}><Settings fontSize="small" /></IconButton>
                         </Tooltip>
                     </>
+                )}
+                notice={im && (
+                    <Box sx={{ display: { xs: 'flex', md: 'none' }, px: 2, py: 1, borderBottom: 1, borderColor: 'divider' }}>
+                        <ProjectImTags im={im} maxVisible={99} showLabel />
+                    </Box>
                 )}
                 side={side}
                 sideAlwaysOpen={overviewAt !== 'side'}
@@ -284,6 +294,7 @@ export default function ProjectPage() {
                         disabled={blocked || !project}
                         disabledReason={banner}
                         onOpenThread={openThread}
+                        chatTitle={im?.chatTitle}
                         onSend={async (text, attachments) => {
                             try {
                                 const m = await unwrap(api.POST('/api/v1/projects/{id}/messages', { params: { path: { id } }, body: { content: text, attachments: attachments.map((a) => a.path) } }));
@@ -340,6 +351,8 @@ export default function ProjectPage() {
             >
                 {threadEl}
             </FloatingWindow>
+
+            {im?.dialog}
 
             {project && settingsTab && (
                 <ProjectSettingsDialog

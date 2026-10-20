@@ -135,7 +135,8 @@ const messages = [
     msg('m2', 'assistant', 'text', 'Traces point at two hot spots: idempotency-key lookups hit Postgres on every request, and the connection pool saturates at peak. I started a thread for each, plus one to add the tracing spans we need to confirm the fix.', 94),
     msg('m3', 'assistant', 'thread_started', '', 94, { thread_ids: ['t-cache', 't-pool', 't-trace'] }),
     msg('m4', 'assistant', 'thread_update', '', 60 * 20, { thread_id: 't-trace', title: 'Add tracing spans to /charge', kind: 'finished' }),
-    msg('m5', 'user', 'text', 'Also make sure SDK retries cannot pile onto an outage.', 30),
+    // Written from the bound Telegram chat (TEP #2143): the conversation shows where it came from.
+    { ...msg('m5', 'user', 'text', 'Also make sure SDK retries cannot pile onto an outage.', 30), source: 'im', source_platform: 'telegram', source_chat_id: 'telegram:123456789' },
     msg('m6', 'assistant', 'thread_started', '', 29, { thread_ids: ['t-sdk'] }),
     msg('m7', 'assistant', 'thread_update', '', 18, { thread_id: 't-cache', title: 'Cache idempotency keys in Redis', kind: 'finished' }),
     msg('m8', 'assistant', 'thread_update', '', 4, { thread_id: 't-pool', title: 'Tune the DB connection pool', kind: 'needs_input' }),
@@ -204,11 +205,49 @@ const sessionEvents = (s: (typeof sessions)[number]) => {
     return [first, ev('assistant', 'Done. The intro now opens with what the tool does and who it is for, in three short paragraphs.', 49)]
 }
 
+// IM chats bound to projects (TEP #2143): a Telegram private chat on the
+// latency project and a Telegram group on Docs. The chat ids match the Remote
+// mocks (handlers.ts: bots/:bot/chats and /groups). Held in memory, so binding
+// and unbinding work within a mock session.
+type Binding = { id: string; platform: string; chat_id: string; chat_title: string; target_kind: 'project'; project_id: string; created_at: string; updated_at: string }
+const bindings: Binding[] = [
+    { id: 'cb-1', platform: 'telegram', chat_id: 'telegram:123456789', chat_title: '123456789', target_kind: 'project', project_id: 'p-latency', created_at: ago(60 * 30), updated_at: ago(60 * 30) },
+    { id: 'cb-2', platform: 'telegram', chat_id: 'telegram:-10024681012', chat_title: 'Release Crew', target_kind: 'project', project_id: 'p-docs', created_at: ago(60 * 48), updated_at: ago(60 * 48) },
+]
+// What the Remote mocks call a chat, to title a new binding.
+const mockChatTitles: Record<string, string> = {
+    'telegram:123456789': '123456789', 'telegram:987654321': '987654321', 'telegram:-10024681012': 'Release Crew',
+    'feishu:oc_mock_chat_0001': 'Platform team',
+}
+
 const summary = (p: Proj) => ({ ...p, threads: counts(p.id) })
 const find = (id: string) => projects.find((p) => p.id === id)
 const notFound = () => HttpResponse.json({ error: 'project not found' }, { status: 404 })
 
 export const projectsHandlers = [
+    // IM channel bindings. Before '/api/v1/projects/:id' so "channel-bindings" is not read as an id.
+    http.get('/api/v1/projects/channel-bindings', () => HttpResponse.json({ bindings })),
+    http.put('/api/v1/projects/channel-bindings', async ({ request }) => {
+        const body = (await request.json()) as { platform: string; chat_id: string; project_id: string }
+        if (!find(body.project_id)) return notFound()
+        // One chat, one place: binding again moves it.
+        const now = ago(0)
+        const old = bindings.find((b) => b.platform === body.platform && b.chat_id === body.chat_id)
+        if (old) {
+            old.project_id = body.project_id
+            old.updated_at = now
+            return HttpResponse.json(old)
+        }
+        const b: Binding = { id: `cb-${Date.now()}`, platform: body.platform, chat_id: body.chat_id, chat_title: mockChatTitles[body.chat_id] ?? body.chat_id, target_kind: 'project', project_id: body.project_id, created_at: now, updated_at: now }
+        bindings.push(b)
+        return HttpResponse.json(b)
+    }),
+    http.delete('/api/v1/projects/channel-bindings/:id', ({ params }) => {
+        const i = bindings.findIndex((b) => b.id === params.id)
+        if (i < 0) return HttpResponse.json({ error: 'binding not found' }, { status: 404 })
+        bindings.splice(i, 1)
+        return new HttpResponse(null, { status: 204 })
+    }),
     http.get('/api/v1/projects/workdirs', () => {
         const rows = [...workdirs.map((w) => w.path), ...sessions.map((x) => x.worktree)]
         const paths = [...new Set(rows)]

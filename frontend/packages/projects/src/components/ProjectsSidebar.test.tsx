@@ -66,4 +66,21 @@ describe('ProjectsSidebar', () => {
         expect(notes.getAttribute('aria-current')).toBe('page');
         expect(within(folders).getByTitle('/home/me/app').getAttribute('href')).toBe('/f?path=%2Fhome%2Fme%2Fapp');
     });
+    it('pins an IM row with the bot count when the host has IM, and leaves it out otherwise', async () => {
+        const h = host([summary('a', 'Alpha', 0)]);
+        const withIm: ProjectsHost = {
+            ...h,
+            paths: { ...h.paths, im: '/im' },
+            im: { listBots: async () => [{ uuid: 'b1', name: 'A', platform: 'telegram', online: true }, { uuid: 'b2', name: 'B', platform: 'feishu', online: false }], listChats: async () => [] },
+        };
+        show(withIm, '/im');
+        const row = await screen.findByRole('link', { name: /im\.title/ });
+        expect(row).toHaveAttribute('href', '/im');
+        expect(row).toHaveAttribute('aria-current', 'page');
+        await waitFor(() => expect(row.textContent).toContain('im.bots'));
+        cleanup();
+        show(h, '/p');
+        await screen.findByRole('region', { name: 'nav.projects' });
+        expect(screen.queryByRole('link', { name: /im\.title/ })).not.toBeInTheDocument();
+    });
 });
