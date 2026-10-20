@@ -67,6 +67,8 @@ func TestFolderThreadRunsInItsFolder(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, folderProject.ID, again.ProjectID)
 	assert.Equal(t, 2, again.Seq)
+	// Let it finish: a turn still writing into the folder races its cleanup.
+	waitStatus(t, f.store, again.ID, db.ThreadIdle)
 }
 
 func TestSessionNeedsAFolderAndAMode(t *testing.T) {
