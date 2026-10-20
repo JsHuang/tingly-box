@@ -23,7 +23,6 @@ export interface UseTemplatePageRulesReturn {
     handleRuleChange: (updatedRule: Rule) => void;
     handleProviderModelsChange: (providerUuid: string, models: any) => void;
     handleRefreshModels: (providerUuid: string) => Promise<void>;
-    handleCreateRule: (options?: CreateRuleOptions) => Promise<string | null>;
     handleCreateRules: (options: CreateRuleOptions[]) => Promise<string[]>;
 }
 
@@ -81,131 +80,66 @@ export const useTemplatePageRules = ({
         }
     }, [showNotification]);
 
-    // Creates one rule through the API, without reloading or notifying, so a
-    // single create and a batch share naming, conflict retry and validation.
-    // Returns the created rule, or an error message.
-    const createOneRule = useCallback(async (
-        options: CreateRuleOptions | undefined,
-        existingNames: Set<string>,
-    ): Promise<{ rule: Rule } | { error: string }> => {
-        const requestModel = options?.model
-            ? resolveRuleName(options.model, existingNames)
-            : `model-${uuidv4().slice(0, 8)}`;
-        const initialServices = options
-            ? [{
-                provider: options.providerUuid,
-                model: options.model,
-                weight: 0,
-                active: true,
-                time_window: 0,
-            }]
-            : [];
-
-        const newRuleData = {
-            scenario: scenario,
-            request_model: requestModel,
-            response_model: '',
-            active: true,
-            services: initialServices,
-        };
-
-        // Create rule via API (empty string for UUID signals backend to generate new UUID)
-        let result = await api.createRule('', newRuleData);
-
-        // If backend reports name conflict, retry once with a random suffix
-        if (!result?.success && result?.error?.includes('already exists')) {
-            newRuleData.request_model = `${requestModel}-${uuidv4().slice(0, 6)}`;
-            result = await api.createRule('', newRuleData);
-        }
-
-        if (!result?.success) {
-            return { error: result?.error || 'Unknown error' };
-        }
-
-        if (!result.data || !result.data.uuid) {
-            console.error('Invalid createRule response:', result);
-            return { error: 'Invalid response from server (missing UUID)' };
-        }
-
-        // Verify the rule has the expected scenario
-        if (result.data.scenario !== scenario) {
-            showNotification(`Warning: Rule created but scenario mismatch (expected: ${scenario}, got: ${result.data.scenario})`, 'warning');
-        }
-
-        existingNames.add(result.data.request_model);
-        return { rule: result.data };
-    }, [scenario, showNotification]);
-
-    const reloadAfterCreate = useCallback(async (created: Rule[]) => {
-        // Reload rules from backend to verify persistence
-        if (loadRules && scenario) {
-            await loadRules(scenario);
-        } else if (onRulesChange) {
-            // Fallback: update local state if loadRules not provided
-            onRulesChange([...rules, ...created]);
-        }
-    }, [scenario, rules, onRulesChange, loadRules]);
-
-    const existingRuleNames = useCallback(
-        () => new Set(rules.map(r => r.request_model).filter(Boolean) as string[]),
-        [rules],
-    );
-
-    const handleCreateRule = useCallback(async (options?: CreateRuleOptions): Promise<string | null> => {
-        if (!scenario) {
-            showNotification('Cannot create rule: scenario not specified', 'error');
-            return null;
-        }
-
-        try {
-            const outcome = await createOneRule(options, existingRuleNames());
-            if ('error' in outcome) {
-                showNotification(`Failed to create rule: ${outcome.error}`, 'error');
-                return null;
-            }
-            await reloadAfterCreate([outcome.rule]);
-            showNotification('Routing rule created successfully!', 'success');
-            return outcome.rule.uuid;
-        } catch (error) {
-            console.error('Error creating rule:', error);
-            showNotification(`Failed to create routing rule: ${(error as Error).message || 'Unknown error'}`, 'error');
-            return null;
-        }
-    }, [scenario, showNotification, createOneRule, existingRuleNames, reloadAfterCreate]);
-
-    // One rule per model, created in order so names stay unique within the
-    // batch; the list reloads once at the end. Returns the created uuids.
+    // Creates one rule per model, in order, so names stay unique within the
+    // batch (a single pick is a batch of one); the list reloads once at the
+    // end and one toast sums it up. Returns the created uuids.
     const handleCreateRules = useCallback(async (options: CreateRuleOptions[]): Promise<string[]> => {
-        if (options.length <= 1) {
-            const uuid = await handleCreateRule(options[0]);
-            return uuid ? [uuid] : [];
-        }
         if (!scenario) {
             showNotification('Cannot create rule: scenario not specified', 'error');
             return [];
         }
 
-        const names = existingRuleNames();
+        const existingNames = new Set(rules.map(r => r.request_model).filter(Boolean) as string[]);
         const created: Rule[] = [];
         const failures: string[] = [];
-        for (const option of options) {
+        for (const { providerUuid, model } of options) {
             try {
-                const outcome = await createOneRule(option, names);
-                if ('error' in outcome) {
-                    failures.push(`${option.model}: ${outcome.error}`);
+                const newRuleData = {
+                    scenario: scenario,
+                    request_model: resolveRuleName(model, existingNames),
+                    response_model: '',
+                    active: true,
+                    services: [{ provider: providerUuid, model, weight: 0, active: true, time_window: 0 }],
+                };
+
+                // Create rule via API (empty string for UUID signals backend to generate new UUID)
+                let result = await api.createRule('', newRuleData);
+
+                // If backend reports name conflict, retry once with a random suffix
+                if (!result?.success && result?.error?.includes('already exists')) {
+                    newRuleData.request_model = `${newRuleData.request_model}-${uuidv4().slice(0, 6)}`;
+                    result = await api.createRule('', newRuleData);
+                }
+
+                if (!result?.success) {
+                    failures.push(`${model}: ${result?.error || 'Unknown error'}`);
+                } else if (!result.data?.uuid) {
+                    console.error('Invalid createRule response:', result);
+                    failures.push(`${model}: Invalid response from server (missing UUID)`);
                 } else {
-                    created.push(outcome.rule);
+                    existingNames.add(result.data.request_model);
+                    created.push(result.data);
                 }
             } catch (error) {
-                failures.push(`${option.model}: ${(error as Error).message || 'Unknown error'}`);
+                console.error('Error creating rule:', error);
+                failures.push(`${model}: ${(error as Error).message || 'Unknown error'}`);
             }
         }
 
         if (created.length > 0) {
-            await reloadAfterCreate(created);
+            // Reload rules from backend to verify persistence
+            if (loadRules) {
+                await loadRules(scenario);
+            } else if (onRulesChange) {
+                // Fallback: update local state if loadRules not provided
+                onRulesChange([...rules, ...created]);
+            }
         }
+
         if (failures.length === 0) {
-            showNotification(`Added ${created.length} models`, 'success');
+            showNotification(created.length === 1 ? 'Routing rule created successfully!' : `Added ${created.length} models`, 'success');
+        } else if (options.length === 1) {
+            showNotification(`Failed to create rule: ${failures[0]}`, 'error');
         } else {
             showNotification(
                 `Added ${created.length} of ${options.length} models. Failed: ${failures.join('; ')}`,
@@ -213,7 +147,7 @@ export const useTemplatePageRules = ({
             );
         }
         return created.map(r => r.uuid);
-    }, [scenario, handleCreateRule, existingRuleNames, createOneRule, reloadAfterCreate, showNotification]);
+    }, [scenario, rules, onRulesChange, showNotification, loadRules]);
 
     return {
         providerModelsByUuid,
@@ -221,7 +155,6 @@ export const useTemplatePageRules = ({
         handleRuleChange,
         handleProviderModelsChange,
         handleRefreshModels,
-        handleCreateRule,
         handleCreateRules,
     };
 };

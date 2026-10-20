@@ -54,7 +54,7 @@ export const useModelSelectDialog = (options: UseModelSelectDialogOptions) => {
     const [currentConfigRecord, setCurrentConfigRecord] = useState<ConfigRecord | null>(null);
     const [modelSelectionCleared, setModelSelectionCleared] = useState(false);
     const [currentAddTier, setCurrentAddTier] = useState<number | undefined>(undefined);
-    // New Model starts single-select (a click creates the rule); the footer's
+    // New Model starts single-select (a click creates the rule); the toolbar's
     // switch turns on multi-select, where clicks collect models in pick order.
     const [multiSelect, setMultiSelect] = useState(false);
     const [picked, setPicked] = useState<ProviderSelectTabOption[]>([]);
