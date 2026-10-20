@@ -7,7 +7,7 @@ import { useTranslation } from 'react-i18next';
 import { api, unwrap, type ProjectSummary } from '../client';
 import { useWorkdirs } from './workdir/useWorkdirs';
 import { folderName } from '../utils/format';
-import { Add, Folder, FolderOpen, Star } from './icons';
+import { Add, ChatBubble, Folder, FolderOpen, Star } from './icons';
 import { PROJECTS_CHANGED, useProjectsHost } from '../host/ProjectsHost';
 
 /** One row of a sidebar section: a place the user can open. */
@@ -48,6 +48,8 @@ export interface ProjectsSidebarProps {
     showWorkdirs?: boolean;
     /** Host sections, rendered after Projects. */
     sections?: ProjectsSidebarSection[];
+    /** Show the IM entry at the bottom when the host has IM (default true). */
+    showIm?: boolean;
     /** Called after a row or link is followed (closes a host's mobile drawer). */
     onNavigate?: () => void;
 }
@@ -89,6 +91,23 @@ function useSidebarProjects(enabled: boolean): ProjectSummary[] | null {
     return projects;
 }
 
+/** How many IM bots the host has, for the sidebar's IM row; null until known or when there is no IM. */
+function useImBotCount(enabled: boolean): number | null {
+    const { im } = useProjectsHost();
+    const [count, setCount] = useState<number | null>(null);
+    useEffect(() => {
+        if (!enabled || !im) return;
+        let alive = true;
+        im.listBots().then((b) => alive && setCount(b.length)).catch(() => {
+            // The row still opens the IM view; it just has no count.
+        });
+        return () => {
+            alive = false;
+        };
+    }, [enabled, im]);
+    return count;
+}
+
 function SectionView({ section, onNavigate }: { section: ProjectsSidebarSection; onNavigate?: () => void }) {
     const title = (
         <Typography noWrap sx={{ flex: 1, fontSize: fontSizes.sm, fontWeight: 600, color: 'text.secondary' }}>
@@ -96,8 +115,8 @@ function SectionView({ section, onNavigate }: { section: ProjectsSidebarSection;
         </Typography>
     );
     return (
-        <Box component="section" aria-label={section.title}>
-            <Box sx={{ display: 'flex', alignItems: 'center', pl: 3, pr: 1.5, minHeight: 32 }}>
+        <Box component="section" aria-label={section.title || undefined}>
+            {section.title && <Box sx={{ display: 'flex', alignItems: 'center', pl: 3, pr: 1.5, minHeight: 32 }}>
                 {section.to ? (
                     <Box component={NavLink} to={section.to} onClick={onNavigate} sx={{ flex: 1, minWidth: 0, display: 'flex', textDecoration: 'none', '&:hover .MuiTypography-root': { color: 'text.primary' } }}>
                         {title}
@@ -110,7 +129,7 @@ function SectionView({ section, onNavigate }: { section: ProjectsSidebarSection;
                         </IconButton>
                     </Tooltip>
                 )}
-            </Box>
+            </Box>}
             <List disablePadding>
                 {section.rows.length === 0 && section.empty && (
                     <Typography variant="body2" color="text.secondary" sx={{ px: 3, py: 1 }}>{section.empty}</Typography>
@@ -150,11 +169,12 @@ function SectionView({ section, onNavigate }: { section: ProjectsSidebarSection;
  * them), followed by whatever sections the host adds. It knows nothing about
  * the host; Tingly Box passes its working folders in as a section.
  */
-export function ProjectsSidebar({ showProjects = true, showWorkdirs = false, sections = [], onNavigate }: ProjectsSidebarProps) {
+export function ProjectsSidebar({ showProjects = true, showWorkdirs = false, showIm = true, sections = [], onNavigate }: ProjectsSidebarProps) {
     const { t } = useTranslation('projects');
     const navigate = useNavigate();
     const location = useLocation();
-    const { paths } = useProjectsHost();
+    const { paths, im } = useProjectsHost();
+    const botCount = useImBotCount(showIm && !!im);
     const projects = useSidebarProjects(showProjects);
     const { workdirs } = useWorkdirs(showWorkdirs);
     const [params] = useSearchParams();
@@ -211,14 +231,36 @@ export function ProjectsSidebar({ showProjects = true, showWorkdirs = false, sec
         empty: workdirs ? t('sidebar.noWorkdirs') : undefined,
     } : null;
 
+    // IM is configuration, not content: one row pinned at the bottom (TEP #2143).
+    const imSection: ProjectsSidebarSection | null = showIm && im && paths.im ? {
+        key: 'im',
+        title: '',
+        rows: [{
+            key: 'im',
+            label: t('im.title'),
+            icon: <ChatBubble />,
+            subtitle: botCount == null ? undefined : t('im.bots', { count: botCount }),
+            to: paths.im,
+            selected: location.pathname === paths.im,
+        }],
+    } : null;
+
     return (
-        <Box component="nav" aria-label={t('nav.projects')} sx={{ py: 1 }}>
-            {[...(projectSection ? [projectSection] : []), ...(workdirSection ? [workdirSection] : []), ...sections].map((s, i) => (
-                <Box key={s.key}>
-                    {i > 0 && <Divider sx={{ mx: 2, my: 1 }} />}
-                    <SectionView section={s} onNavigate={onNavigate} />
+        <Box component="nav" aria-label={t('nav.projects')} sx={{ py: 1, minHeight: '100%', boxSizing: 'border-box', display: 'flex', flexDirection: 'column' }}>
+            <Box sx={{ flex: 1 }}>
+                {[...(projectSection ? [projectSection] : []), ...(workdirSection ? [workdirSection] : []), ...sections].map((s, i) => (
+                    <Box key={s.key}>
+                        {i > 0 && <Divider sx={{ mx: 2, my: 1 }} />}
+                        <SectionView section={s} onNavigate={onNavigate} />
+                    </Box>
+                ))}
+            </Box>
+            {imSection && (
+                <Box sx={{ position: 'sticky', bottom: 0, bgcolor: 'background.paper', mt: 1 }}>
+                    <Divider sx={{ mx: 2, mb: 1 }} />
+                    <SectionView section={imSection} onNavigate={onNavigate} />
                 </Box>
-            ))}
+            )}
         </Box>
     );
 }
