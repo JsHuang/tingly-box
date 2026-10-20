@@ -96,7 +96,7 @@ export default function ImSettingsPage() {
                                                 <TableBody>
                                                     {rows.map((c) => {
                                                         const b = byChat.get(chatKey(c.platform, c.chatId));
-                                                        const placeName = b ? projectNames.get(b.project_id) : undefined;
+                                                        const placeName = b ? projectNames.get(b.project_id ?? '') : undefined;
                                                         return (
                                                             <TableRow key={chatKey(c.platform, c.chatId)}>
                                                                 <TableCell sx={{ pl: 2 }}>
@@ -104,7 +104,7 @@ export default function ImSettingsPage() {
                                                                     <Typography noWrap sx={{ fontSize: fontSizes.sm, color: 'text.secondary' }}>{t(`im.chatKind.${c.kind}`)}</Typography>
                                                                 </TableCell>
                                                                 <TableCell>
-                                                                    {b ? (
+                                                                    {b?.project_id ? (
                                                                         <Link component={RouterLink} to={paths.project(b.project_id)} underline="hover" color="text.primary" noWrap sx={{ display: 'block', fontSize: '0.875rem' }}>
                                                                             {placeName ?? t('im.place.elsewhere')}
                                                                         </Link>
