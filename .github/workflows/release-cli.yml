@@ -283,9 +283,10 @@ jobs:
 
   # The explicit conditions on the jobs below: a skipped ancestor (frontend,
   # harness when orchestrated) would otherwise skip them too.
+  # When orchestrated, release.yml announces one combined CLI + GUI publish.
   announce-npm-publish:
     needs: github-release
-    if: ${{ !cancelled() && needs.github-release.result == 'success' }}
+    if: ${{ !cancelled() && !inputs.orchestrated && needs.github-release.result == 'success' }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -301,7 +302,7 @@ jobs:
         with:
           tag: ${{ inputs.release_tag }}
           publish_cli: true
-          publish_gui: false # release-gui.yml announces its own
+          publish_gui: false
           build_docker: true
 
   # Verify the CLI release we just published. verify-release-cli.yml's own

@@ -37,7 +37,7 @@ on:
         description: '[pkg: tingly-box-gui] desktop UI with bundled frontend'
         required: false
         type: boolean
-        default: false
+        default: true
       build_docker:
         description: '[docker] build and push the npm-installed Docker image after CLI publish'
         required: false

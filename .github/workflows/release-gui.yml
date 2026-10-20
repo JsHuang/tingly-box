@@ -303,7 +303,9 @@ jobs:
           } > desktop-notes.md
           gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --notes-file desktop-notes.md
 
+      # When orchestrated, release.yml announces one combined CLI + GUI publish.
       - name: Announce GUI npm publish
+        if: ${{ !inputs.orchestrated }}
         uses: ./.github/actions/announce-npm
         with:
           tag: ${{ inputs.release_tag }}

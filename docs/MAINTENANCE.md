@@ -192,8 +192,10 @@ Publishes npm packages based on an existing GitHub Release.
 It only runs when you start it (`workflow_dispatch`); a release never publishes
 to npm by itself. After a tag push, `release-cli.yml` (`announce-npm-publish`)
 and `release-gui.yml` (the last step of `publish`) leave a note in their job
-summary with the suggested inputs (`v1.2.3` → `latest`, `v1.2.3-rc1` → `rc`;
-CLI + Docker from the CLI pipeline, GUI only from the GUI one). You then run
+summary with the suggested inputs (`v1.2.3` → `latest`, `v1.2.3-rc1` → `rc`).
+When `release.yml` runs both pipelines it leaves one combined note
+(`announce-npm`: CLI + GUI + Docker in a single `npm.yml` run, one approval);
+a pipeline run alone announces only its own half. You then run
 the workflow yourself, choose tag, dist-tag and which packages to publish, and
 approve the `production` environment before anything is published.
 
