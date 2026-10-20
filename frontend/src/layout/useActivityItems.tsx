@@ -404,8 +404,12 @@ export function useActivityItems(): ActivityItem[] {
                     }]),
                 ],
             },
+            // System has no rail icon: it opens from the gear at the foot of
+            // the rail (the settings menu's "All settings"), and keeps its
+            // sidebar here.
             {
                 key: 'system',
+                railHidden: true,
                 icon: <IconSettings sx={{ fontSize: 22 }} />,
                 label: t('layout.system'),
                 defaultPath: '/system',

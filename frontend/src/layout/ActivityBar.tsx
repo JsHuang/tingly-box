@@ -1,4 +1,4 @@
-import { Person as IconUser, ChevronRight as IconChevronRight, Lightbulb as IconLightbulb, Error as IconAlertCircle, Star as IconStar } from '@/components/icons';
+import { Settings as IconSettings, ChevronRight as IconChevronRight, Lightbulb as IconLightbulb, Error as IconAlertCircle, Star as IconStar } from '@/components/icons';
 import { displayVersion } from '@/utils/version';
 import { Badge, Box, Divider, IconButton, ListItemButton, ListItemIcon, Tooltip, Typography } from '@mui/material';
 import React, { useCallback, useState } from 'react';
@@ -120,7 +120,7 @@ export const ActivityBar: React.FC<ActivityBarProps> = ({
             </ListItemButton>
         );
     };
-    const listItems = activityItems.filter((item) => item.dock !== 'bottom');
+    const listItems = activityItems.filter((item) => item.dock !== 'bottom' && !item.railHidden);
     const dockedItems = activityItems.filter((item) => item.dock === 'bottom');
 
     return (
@@ -295,10 +295,12 @@ export const ActivityBar: React.FC<ActivityBarProps> = ({
                         aria-label={t('layout.activityBar.preferences')}
                         sx={activityBottomItemSx({
                             '&:hover': { bgcolor: 'action.hover', color: 'text.primary' },
+                            // On a System page the gear is the lit rail item.
+                            ...(activeActivity === 'system' && { color: 'primary.main', bgcolor: 'action.selected' }),
                         })}
                     >
                         <ListItemIcon sx={{ minWidth: 0, color: 'inherit', justifyContent: 'center' }}>
-                            <IconUser sx={{ fontSize: 20 }} />
+                            <IconSettings sx={{ fontSize: 20 }} />
                         </ListItemIcon>
                     </ListItemButton>
                 </Tooltip>

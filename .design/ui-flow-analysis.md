@@ -386,3 +386,11 @@
 **人工打标反馈（2026-10-19）**："把 guardrails、skills、prompt、bench 收敛到 power up……别的先不动"；并明确："不是 power up 那个菜单，而是新开一个项叫 power up，原来那个菜单是用来控制打开的，而不是用来管理 layout 的"。
 
 **结论**：新增 rail 项 Power-ups（闪电图标），放在原 Prompt 的位置；sidebar 按功能分组，组间用分隔线：Guardrails（概览行改名为 Guardrails，其余子页不变）→ Prompt 的 User Request / Skills → Bench。只列已打开的功能，全部关闭时整个 rail 项消失。Power-ups 菜单（偏好菜单里）职责不变，仍只管开关。Team、Image、Remote、Tools 本轮不动。同一个词指同一组东西：菜单里打开的，就出现在这个 rail 项里。
+
+## 11. 第 5 轮：System 从设置齿轮进
+
+**发现（F17）**：rail 底部的人像按钮打开的是偏好菜单（语言、主题、Power-ups、全部设置、反馈），里面没有任何"人"的内容；System 又作为一个 rail 项单独占位，和菜单里的"全部设置"指向同一处。
+
+**人工打标反馈（2026-10-20）**："菜单其实收到了人像里，倒不如下面放齿轮对应设置菜单，然后真的 system 以后从这里开？"
+
+**结论**：底部按钮的人像换成齿轮，它就是设置入口；System 不再占 rail 位置，从齿轮菜单的"全部设置"进入，进入 System 各页时齿轮高亮。System 的 sidebar（General / Access Control / Experimental / Develop / Logs）不变（`ActivityItem.railHidden`：不画 rail 图标，但仍拥有自己的 sidebar 和路由高亮）。菜单内容不变。

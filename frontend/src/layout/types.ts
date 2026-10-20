@@ -64,6 +64,12 @@ export interface ActivityItem {
      * preferences button, instead of in the scrolling list.
      */
     dock?: 'bottom';
+    /**
+     * Not a rail icon: the activity is opened from elsewhere (System, from the
+     * gear at the foot of the rail) but still owns its sidebar and lights up
+     * its pages' routes.
+     */
+    railHidden?: boolean;
     /** Something here needs the user: a dot on the rail icon, with this as its hover text. */
     attention?: string;
     /**
