@@ -150,8 +150,8 @@ M3 之前，需要审批的线程在 IM 里只有提示，靠 Web 处理，这�
 - **表与字段**：`channel_bindings`（`(platform, chat_id)` 唯一；`target_kind` 目前只有 `project`；`workdir_id`、`focus_thread_id` 可空，留给 M2/M4（统一模型折成 `thread_id`，`target_kind`、`workdir_id`、`focus_thread_id` 随之去掉））。`project_messages` 新增 `source`（`im`，空=Web）、`source_platform`、`source_chat_id`。删除项目会一并解绑它的 chat。
 - **接口**（`/api/v1/projects` 下）：`GET /channel-bindings?project_id=`、`PUT /channel-bindings`（`platform`、`chat_id`、`project_id`，可选 `chat_title`；已绑定的 chat 再绑即**改绑**，同一行）、`DELETE /channel-bindings/:id`。归档的项目不能被绑定。
 - **入站**：`remoteagent.ProjectRouter`（小接口，`BotHandler` 可选持有）在 `HandleMessage` 里、`@cc`/`@tb` 握手词检测**之前**取走**已绑定 chat 的非斜杠文本**；斜杠命令（`/help`、`/bind`、`/cd`…）、正在输入 `/cd` 路径的 chat、以及访问控制/配对/黑名单都照旧在它前面或旁边。没有绑定的 chat 不受任何影响。绑定了项目的 chat 发附件，回一句“暂不支持”，而不是悄悄送去 `@cc`。投递失败（如项目已暂停）会把原因回给 chat。
-- **走 Web 同一条路径**：入站只是 `Coordinator.PostFrom`（`Post` 加来源），所以排队、暂停/归档检查、事件推送都和 Web 一致。
-- **出站**：Projects 的可选 Host 能力 `ChannelSink.SendChannelText(platform, chatID, text)`（类型断言，独立版没有，不发送）。`Relay` 在 `Coordinator.OnFinal`（助手回复、线程汇报、出错）和 `Threads.OnWait`（线程要审批/提问）上挂钩，**按完成顺序逐条**发给项目绑定的**所有** chat，前缀 `[项目名] `；线程汇报折成一行（首行，最多 240 字）；审批/提问只发一行“某线程需要你，请到 Web 处理”，同一线程 5 分钟内只提醒一次。用户自己发的消息不回显。
+- **走 Web 同一条路径**：入站只是 `Service.PostFromChannel`（解析绑定的线程，再调 `Service.Send(thread, text, source)`，来源记为 `im`），所以排队、暂停/归档检查、事件推送都和 Web 一致。
+- **出站**：Projects 的可选 Host 能力 `ChannelSink.SendChannelText(platform, chatID, text)`（类型断言，独立版没有，不发送）。`Relay` 在 `Coordinator.OnFinal`（主线程的助手回复、线程汇报、出错）、`Threads.OnReply`（非主线程每轮结束的文本或错误，只发给绑在该线程自己上的 chat）和 `Threads.OnWait`（线程要审批/提问）上挂钩，**按完成顺序逐条**发给项目绑定的**所有** chat，前缀 `[项目名] `；线程汇报折成一行（首行，最多 240 字）；审批/提问只发一行“某线程需要你，请到 Web 处理”，同一线程 5 分钟内只提醒一次。用户自己发的消息不回显。
 - **Tingly Box 一侧**：`internal/server/module/projects.ChatBridge` 同时实现 `ProjectRouter` 和 `ChannelSink`，经 bot 的 `remote/channel.Channel.Send` 发送（与通知同一条路径，微信的 `context_token` 等照常）。哪个 bot 发：优先该 chat 最近一次入站所用的 bot；重启后还没收到过消息时，依次试该平台的 bot。被屏蔽（disabled）的 chat 不发。Projects 开关关闭时桥不接任何消息。
 - **没做**：working folder 绑定、IM 里审批（M3）、`@N`、聚焦、媒体入站、`chat_title` 的自动获取（现在只有显式传入）。
 

@@ -1,7 +1,9 @@
 package project
 
 import (
+	"context"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 	"github.com/tingly-dev/tingly-box/projects/internal/db"
@@ -42,4 +44,42 @@ func (f *testFixture) startFolder(folder string, spec FolderThreadSpec) (*db.Thr
 	}
 	spec.ProjectID = p.ID
 	return f.threads.StartFolderThread(spec)
+}
+
+// shutdownAndSettle stops every turn and waits for the threads' bookkeeping
+// to finish, so no goroutine is still writing into a test's temp dir (events,
+// git stats, worktree files) when t.TempDir's cleanup removes it.
+func shutdownAndSettle(th *Threads) {
+	th.Shutdown(context.Background())
+	deadline := time.Now().Add(10 * time.Second)
+	for time.Now().Before(deadline) {
+		th.mu.Lock()
+		idle := len(th.active) == 0
+		th.mu.Unlock()
+		if idle {
+			return
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+}
+
+// settleCoordinator waits for the coordinator's running turns to finish, for
+// the same reason. Register it after the coordinator is made: cleanups run in
+// reverse, so it runs before the threads shut down.
+func settleCoordinator(c *Coordinator) {
+	deadline := time.Now().Add(10 * time.Second)
+	for time.Now().Before(deadline) {
+		c.mu.Lock()
+		idle := true
+		for _, q := range c.queues {
+			if q.running {
+				idle = false
+			}
+		}
+		c.mu.Unlock()
+		if idle {
+			return
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
 }

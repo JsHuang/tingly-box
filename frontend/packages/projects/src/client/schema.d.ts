@@ -306,8 +306,8 @@ export interface paths {
         options?: never;
         head?: never;
         /**
-         * Update project settings; pause, resume, archive, unarchive, star
-         * @description Update project settings; pause, resume, archive, unarchive, star
+         * Update project settings; pause, resume, archive, unarchive, star. A folder has no repos or thread model: setting either on a folder is a 400.
+         * @description Update project settings; pause, resume, archive, unarchive, star. A folder has no repos or thread model: setting either on a folder is a 400.
          */
         patch: operations["apiV1ProjectsIdPatch"];
         trace?: never;

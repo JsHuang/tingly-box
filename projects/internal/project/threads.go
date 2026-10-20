@@ -79,6 +79,10 @@ type Threads struct {
 	env    ThreadEnv
 	// OnReport is called after each turn that was not stopped by the user.
 	OnReport func(Report)
+	// OnReply is called after each turn that was not stopped by the user, for
+	// every kind of thread (a folder thread included), with the turn's final
+	// text or error. The chats bound to that thread hear it. It must not block.
+	OnReply func(Report)
 	// OnWait is called when a thread stops to ask the user for an approval
 	// or an answer. It must not block.
 	OnWait func(db.Thread)
@@ -792,6 +796,10 @@ func (m *Threads) settle(threadID string, end engine.TurnEnd, tally *turnTally) 
 		m.addEvent(t, &db.ThreadEvent{Kind: db.EvReport, Content: report.Text, Payload: jsonString(map[string]any{
 			"status": t.Status, "commits_ahead": stats.CommitsAhead, "files_changed": stats.FilesChanged, "uncommitted": stats.Uncommitted,
 		})})
+	}
+	if report.Kind != "" && m.OnReply != nil {
+		report.Thread = *t
+		m.OnReply(report)
 	}
 	if session {
 		// Nobody to report to; the session page shows the turn itself.

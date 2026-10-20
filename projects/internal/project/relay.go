@@ -13,7 +13,8 @@ import (
 )
 
 // Relay sends a thread's finished replies and folded thread reports to the
-// chats bound to that thread, and a descendant's "needs you" to the chats
+// chats bound to that thread (a worker's or folder thread's own turn end
+// included), and a descendant's "needs you" to the chats
 // bound to it or to any ancestor. Messages go out one at a time, in the order
 // they finished.
 type Relay struct {
@@ -61,6 +62,24 @@ func (r *Relay) Message(e db.ThreadEvent) {
 	}
 }
 
+// ThreadReply relays the end of a turn of a non-main thread (a worker or a
+// folder thread) to the chats bound to that very thread. Chats bound to its
+// parent already hear it as the coordinator's thread report, so only this
+// thread's own chats are addressed.
+func (r *Relay) ThreadReply(rep Report) {
+	if r == nil || r.sink == nil {
+		return
+	}
+	text := strings.TrimSpace(rep.Text)
+	if text == "" {
+		return
+	}
+	if rep.Kind == ReportFailed {
+		text = "Error: " + text
+	}
+	r.enqueue([]string{rep.Thread.ID}, text)
+}
+
 // NeedsUser tells the chats of a thread, and of its ancestors, that it is
 // waiting for an approval or an answer. Answering happens in the web UI.
 func (r *Relay) NeedsUser(t db.Thread) {
@@ -73,6 +92,11 @@ func (r *Relay) NeedsUser(t db.Thread) {
 	if seen && now.Sub(last) < relayNeedsUserEvery {
 		r.mu.Unlock()
 		return
+	}
+	for id, at := range r.notified {
+		if now.Sub(at) >= relayNeedsUserEvery {
+			delete(r.notified, id)
+		}
 	}
 	r.notified[t.ID] = now
 	r.mu.Unlock()

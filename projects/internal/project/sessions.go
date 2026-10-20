@@ -99,6 +99,9 @@ func (m *Threads) StartFolderThread(spec FolderThreadSpec) (*db.Thread, error) {
 	if p.ArchivedAt != nil {
 		return nil, ErrArchived
 	}
+	if p.Paused {
+		return nil, ErrPaused
+	}
 	folder, err := CleanFolder(p.Path)
 	if err != nil {
 		return nil, err

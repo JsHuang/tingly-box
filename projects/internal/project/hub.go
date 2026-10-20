@@ -6,7 +6,9 @@ import (
 )
 
 // AllProjects subscribes to every project's events (the sidebar's stream); it
-// carries everything but streamed coordinator text.
+// carries thread, project and coordinator events, but neither streamed
+// coordinator text nor thread transcript entries (tool results and payloads,
+// which only the project's own stream needs).
 const AllProjects = "*"
 
 // Event types pushed to a project's SSE stream.
@@ -71,7 +73,7 @@ func (h *Hub) Publish(ev Event) {
 		}
 	}
 	send(h.subs[ev.ProjectID])
-	if ev.Type != EventMessageDelta {
+	if ev.Type != EventMessageDelta && ev.Type != EventThreadEvent {
 		send(h.subs[AllProjects])
 	}
 }

@@ -248,6 +248,23 @@ func (h *Handler) thread(c *gin.Context) (*db.Thread, bool) {
 	return t, true
 }
 
+// worker loads the thread named in the path for an action that only makes
+// sense on a thread that runs an agent session. A project's main thread is its
+// conversation with the coordinator: it cannot be archived, stopped, merged,
+// answered or configured like a worker, so those requests are refused (400)
+// instead of acting on the conversation.
+func (h *Handler) worker(c *gin.Context) (*db.Thread, bool) {
+	t, ok := h.thread(c)
+	if !ok {
+		return nil, false
+	}
+	if t.Agent == db.AgentLLM {
+		apierr.BadRequest(c, "not available on a project's main thread; use the project's own settings and messages")
+		return nil, false
+	}
+	return t, true
+}
+
 // owner is whose uploads the thread's messages read.
 func (h *Handler) owner(t *db.Thread) (string, error) {
 	p, err := h.svc.Store.GetProject(t.ProjectID)
@@ -258,6 +275,10 @@ func (h *Handler) owner(t *db.Thread) (string, error) {
 }
 
 func (h *Handler) list(c *gin.Context) {
+	if _, err := h.svc.Store.GetProject(c.Param("id")); err != nil {
+		apierr.Store(c, err, "project")
+		return
+	}
 	threads, err := h.svc.Store.ListThreads(c.Param("id"))
 	if err != nil {
 		fail(c, err)
@@ -369,7 +390,7 @@ func (h *Handler) respond(c *gin.Context) {
 	if !apierr.Bind(c, &req) {
 		return
 	}
-	cur, ok := h.thread(c)
+	cur, ok := h.worker(c)
 	if !ok {
 		return
 	}
@@ -381,7 +402,7 @@ func (h *Handler) respond(c *gin.Context) {
 }
 
 func (h *Handler) stop(c *gin.Context) {
-	cur, ok := h.thread(c)
+	cur, ok := h.worker(c)
 	if !ok {
 		return
 	}
@@ -400,7 +421,7 @@ func (h *Handler) reply(c *gin.Context, id string) {
 }
 
 func (h *Handler) archive(c *gin.Context) {
-	cur, ok := h.thread(c)
+	cur, ok := h.worker(c)
 	if !ok {
 		return
 	}
@@ -413,7 +434,7 @@ func (h *Handler) archive(c *gin.Context) {
 }
 
 func (h *Handler) reopen(c *gin.Context) {
-	cur, ok := h.thread(c)
+	cur, ok := h.worker(c)
 	if !ok {
 		return
 	}
@@ -439,7 +460,7 @@ func (h *Handler) diff(c *gin.Context) {
 }
 
 func (h *Handler) merge(c *gin.Context) {
-	cur, ok := h.thread(c)
+	cur, ok := h.worker(c)
 	if !ok {
 		return
 	}
@@ -461,7 +482,7 @@ func (h *Handler) setAutoAnswer(c *gin.Context) {
 	if !apierr.Bind(c, &req) {
 		return
 	}
-	t, ok := h.thread(c)
+	t, ok := h.worker(c)
 	if !ok {
 		return
 	}
@@ -478,7 +499,7 @@ func (h *Handler) setPermissionMode(c *gin.Context) {
 	if !apierr.Bind(c, &req) {
 		return
 	}
-	t, ok := h.thread(c)
+	t, ok := h.worker(c)
 	if !ok {
 		return
 	}
@@ -495,7 +516,11 @@ func (h *Handler) setProfile(c *gin.Context) {
 	if !apierr.Bind(c, &req) {
 		return
 	}
-	out, err := h.svc.Threads.SetProfile(c.Request.Context(), c.Param("id"), req.Profile)
+	t, ok := h.worker(c)
+	if !ok {
+		return
+	}
+	out, err := h.svc.Threads.SetProfile(c.Request.Context(), t.ID, req.Profile)
 	if err != nil {
 		fail(c, err)
 		return
@@ -508,7 +533,11 @@ func (h *Handler) setModel(c *gin.Context) {
 	if !apierr.Bind(c, &req) {
 		return
 	}
-	out, err := h.svc.Threads.SetModel(c.Request.Context(), c.Param("id"), req.Model)
+	t, ok := h.worker(c)
+	if !ok {
+		return
+	}
+	out, err := h.svc.Threads.SetModel(c.Request.Context(), t.ID, req.Model)
 	if err != nil {
 		fail(c, err)
 		return
@@ -517,7 +546,11 @@ func (h *Handler) setModel(c *gin.Context) {
 }
 
 func (h *Handler) handoff(c *gin.Context) {
-	cmd, err := h.svc.Threads.Handoff(c.Param("id"))
+	t, ok := h.worker(c)
+	if !ok {
+		return
+	}
+	cmd, err := h.svc.Threads.Handoff(t.ID)
 	if err != nil {
 		fail(c, err)
 		return

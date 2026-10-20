@@ -146,6 +146,12 @@ ChannelBinding(platform, chat_id) ──▶ thread_id
 - 文件夹线程共用一个全局运行位（和原来的会话一致）。
 - 旧表 `project_messages`、`workdirs` 保留只读一个版本；迁移里丢弃项目已不存在的悬空绑定。
 - 路径大小写折叠只在 windows/darwin 上做。
+- 迁移前先用 `VACUUM INTO` 把库存成 `<库路径>.pre-unified-threads`（只在尚未迁移的已有库上做一次，已有备份不覆盖；内存库不做）。回滚方式就是换回这个文件。
+- `project_id` 指向已不存在的项目的线程，迁移时收进一个 `type=folder` 的 “(recovered)” 项目：它们共用一个 `cwd` 就用该文件夹（已有文件夹项目则并入），否则用 `<projects 目录>/recovered/<原项目 id>` 作合成路径。这些线程不会让启动永远失败。绑定数量同样校验：迁移的 + 丢弃的 = 原有的。
+- 主线程（`agent=llm`）上 `archive|reopen|merge|handoff|respond|stop` 和 `model|profile|permission-mode|auto-answer` 一律 400，不会作用到项目对话。
+- IM 出站：非主线程每轮结束的文本或错误，只发给绑在**该线程自己**上的 chat（`Threads.OnReply`）；绑在主线程的 chat 仍只通过协调者的 `thread_update` 收到汇报，不会重复。
+- 所有项目的 SSE（`/projects/events`）不转发 `thread_event`（工具结果等载荷），只有 `thread`、`project`、`coordinator`。
+- 文件夹项目的 `PATCH` 带 `repos` 或 `thread_model` 返回 400；暂停的文件夹不能开新线程（和 `Send` 一致）。
 
 ## 交付
 

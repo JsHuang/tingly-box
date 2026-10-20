@@ -3,6 +3,7 @@ package project
 import (
 	"context"
 	"errors"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -59,18 +60,38 @@ func (f *fakeSink) none(t *testing.T) {
 // channelFixture is a project with a coordinator whose replies go to chats.
 func channelFixture(t *testing.T) (*testFixture, *Service, *fakeSink) {
 	t.Helper()
-	f := newFixture(t, func(turn *enginetest.Turn) error {
+	return channelFixtureWith(t, func(turn *enginetest.Turn) error {
 		turn.Say("ok", 1, 1)
 		return nil
 	})
+}
+
+// waitQuiet waits until a thread's turn has fully ended and the relay has
+// delivered everything queued, so a later binding cannot catch a late reply.
+func waitQuiet(t *testing.T, f *testFixture, svc *Service, threadID string) {
+	t.Helper()
+	require.Eventually(t, func() bool { return !f.threads.Running(threadID) }, 5*time.Second, 5*time.Millisecond)
+	require.Eventually(t, func() bool { return !svc.Coordinator.Busy(f.project.ID) }, 5*time.Second, 5*time.Millisecond)
+	require.Eventually(t, func() bool {
+		svc.Relay.mu.Lock()
+		defer svc.Relay.mu.Unlock()
+		return !svc.Relay.running && len(svc.Relay.queue) == 0
+	}, 5*time.Second, 5*time.Millisecond)
+}
+
+func channelFixtureWith(t *testing.T, script func(turn *enginetest.Turn) error) (*testFixture, *Service, *fakeSink) {
+	t.Helper()
+	f := newFixture(t, script)
 	src := &fakeLLM{fn: func(req llm.Request) llm.Result {
 		return llm.Result{Text: "Echo: " + lastUserText(req)}
 	}}
 	coord := NewCoordinator(f.store, f.threads.layout, f.threads.hub, f.threads, src)
+	t.Cleanup(func() { settleCoordinator(coord) })
 	sink := newFakeSink()
 	relay := NewRelay(f.store, sink)
 	coord.OnFinal = relay.Message
 	f.threads.OnWait = relay.NeedsUser
+	f.threads.OnReply = relay.ThreadReply
 	return f, &Service{Store: f.store, Layout: f.threads.layout, Hub: f.threads.hub, Threads: f.threads, Coordinator: coord, Relay: relay}, sink
 }
 
@@ -256,4 +277,85 @@ func TestWithoutASinkNothingIsRelayed(t *testing.T) {
 	defer relay.mu.Unlock()
 	assert.Empty(t, relay.queue)
 	assert.False(t, relay.running, "standalone hosts have no IM; the relay does nothing")
+}
+
+func TestWorkerTurnEndReachesChatsBoundToThatThreadOnly(t *testing.T) {
+	f, svc, sink := channelFixture(t)
+	th := startWorker(t, f)
+	waitQuiet(t, f, svc, th.ID)
+	_, err := svc.BindChannel("telegram", "own", "", th.ID, "")
+	require.NoError(t, err)
+	_, err = svc.BindChannel("telegram", "up", "", "", f.project.ID)
+	require.NoError(t, err)
+
+	_, err = svc.Send(context.Background(), th.ID, "again", nil, Source{})
+	require.NoError(t, err)
+
+	// The chat on the worker hears its reply once; the chat on the main thread
+	// hears the coordinator (the folded report and its own reply), never the
+	// worker's raw text as well.
+	byChat := map[string][]string{}
+	deadline := time.After(5 * time.Second)
+	for len(byChat["own"]) < 1 || len(byChat["up"]) < 2 {
+		select {
+		case m := <-sink.ch:
+			byChat[m.chatID] = append(byChat[m.chatID], m.text)
+		case <-deadline:
+			t.Fatalf("got only %v", byChat)
+		}
+	}
+	sink.none(t)
+	assert.Equal(t, []string{"[Demo] ok"}, byChat["own"], "the worker's final text, with the project's name")
+	assert.NotContains(t, byChat["up"], "[Demo] ok")
+	assert.Contains(t, byChat["up"], `[Demo] Thread "Worker" finished: ok`)
+}
+
+func TestWorkerFailureReachesItsChatAsAnError(t *testing.T) {
+	f, svc, sink := channelFixtureWith(t, func(turn *enginetest.Turn) error {
+		if strings.Contains(turn.Prompt, "boom") {
+			return errors.New("it broke")
+		}
+		turn.Say("ok", 1, 1)
+		return nil
+	})
+	th := startWorker(t, f)
+	waitQuiet(t, f, svc, th.ID)
+	_, err := svc.BindChannel("telegram", "own", "", th.ID, "")
+	require.NoError(t, err)
+
+	_, err = svc.Send(context.Background(), th.ID, "boom", nil, Source{})
+	require.NoError(t, err)
+	assert.Contains(t, sink.next(t).text, "[Demo] Error: ")
+	sink.none(t)
+}
+
+func TestFolderThreadReplyReachesItsChat(t *testing.T) {
+	f, svc, sink := channelFixture(t)
+	dir := t.TempDir()
+	s, err := f.startFolder(dir, FolderThreadSpec{Task: "go"})
+	require.NoError(t, err)
+	waitQuiet(t, f, svc, s.ID)
+	sink.none(t)
+	_, err = svc.BindChannel("telegram", "fold", "", s.ID, "")
+	require.NoError(t, err)
+
+	_, err = svc.Send(context.Background(), s.ID, "more", nil, Source{})
+	require.NoError(t, err)
+	got := sink.next(t)
+	assert.Equal(t, "fold", got.chatID)
+	assert.Equal(t, "["+filepath.Base(dir)+"] ok", got.text, "a folder's name stands for its project")
+}
+
+func TestNeedsUserDoesNotGrowWithoutBound(t *testing.T) {
+	f, svc, _ := channelFixture(t)
+	now := time.Now()
+	svc.Relay.now = func() time.Time { return now }
+	for _, id := range []string{"a", "b", "c"} {
+		svc.Relay.NeedsUser(db.Thread{ID: id, ProjectID: f.project.ID})
+	}
+	now = now.Add(relayNeedsUserEvery + time.Second)
+	svc.Relay.NeedsUser(db.Thread{ID: "d", ProjectID: f.project.ID})
+	svc.Relay.mu.Lock()
+	defer svc.Relay.mu.Unlock()
+	assert.Len(t, svc.Relay.notified, 1, "entries past the window are dropped")
 }

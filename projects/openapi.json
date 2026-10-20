@@ -671,8 +671,8 @@
         "tags": [
           "projects"
         ],
-        "summary": "Update project settings; pause, resume, archive, unarchive, star",
-        "description": "Update project settings; pause, resume, archive, unarchive, star",
+        "summary": "Update project settings; pause, resume, archive, unarchive, star. A folder has no repos or thread model: setting either on a folder is a 400.",
+        "description": "Update project settings; pause, resume, archive, unarchive, star. A folder has no repos or thread model: setting either on a folder is a 400.",
         "operationId": "apiV1ProjectsIdPatch",
         "parameters": [
           {

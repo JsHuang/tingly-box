@@ -193,7 +193,7 @@ func (h *Handler) RegisterRoutes(r *module.Routes) {
 		swagger.WithDescription("Get a project with its threads"),
 		swagger.WithResponseModel(ProjectDetailResponse{}))
 	api.PATCH("/projects/:id", h.update, tag,
-		swagger.WithDescription("Update project settings; pause, resume, archive, unarchive, star"),
+		swagger.WithDescription("Update project settings; pause, resume, archive, unarchive, star. A folder has no repos or thread model: setting either on a folder is a 400."),
 		swagger.WithRequestModel(UpdateProjectRequest{}),
 		swagger.WithResponseModel(db.Project{}))
 	api.DELETE("/projects/:id", h.delete, tag,
@@ -372,6 +372,10 @@ func (h *Handler) update(c *gin.Context) {
 	}
 	p, ok := h.project(c)
 	if !ok {
+		return
+	}
+	if p.Type == db.ProjectFolder && (req.Repos != nil || req.ThreadModel != nil) {
+		apierr.BadRequest(c, "repos and thread_model do not apply to a folder")
 		return
 	}
 	if req.Name != nil {

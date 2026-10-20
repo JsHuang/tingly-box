@@ -108,6 +108,7 @@ func TestSendToAMainThreadGoesToTheCoordinator(t *testing.T) {
 func TestChatBoundToAThreadTalksToThatThread(t *testing.T) {
 	f, svc, sink := channelFixture(t)
 	th := startWorker(t, f)
+	waitQuiet(t, f, svc, th.ID)
 	// The turn's report reaches the coordinator, which the main thread's
 	// chats would hear; this chat is on the worker.
 	b, err := svc.BindChannel("telegram", "w", "", th.ID, "")
@@ -120,6 +121,7 @@ func TestChatBoundToAThreadTalksToThatThread(t *testing.T) {
 	require.True(t, handled)
 	waitStatus(t, f.store, th.ID, db.ThreadIdle)
 
+	assert.Equal(t, "[Demo] ok", sink.next(t).text, "the worker answers the chat bound to it")
 	evs := userEvents(t, f.store, th.ID)
 	last := evs[len(evs)-1]
 	assert.Equal(t, "from the chat", last.Content)
@@ -132,6 +134,7 @@ func TestChatBoundToAThreadTalksToThatThread(t *testing.T) {
 func TestNeedsYouReachesChatsOfTheThreadAndItsAncestors(t *testing.T) {
 	f, svc, sink := channelFixture(t)
 	th := startWorker(t, f)
+	waitQuiet(t, f, svc, th.ID)
 	_, err := svc.BindChannel("telegram", "up", "", "", f.project.ID)
 	require.NoError(t, err)
 	_, err = svc.BindChannel("telegram", "own", "", th.ID, "")
