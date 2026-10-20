@@ -11,7 +11,6 @@ import {
     Event as IconCalendarEvent,
     Add as IconPlus,
     TextSnippet as IconFileText,
-    Psychology as IconBrain,
     RemoteControl as IconRemote,
     Robot as IconRobot,
     Terminal as IconTerminal,
