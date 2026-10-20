@@ -1,14 +1,16 @@
 import { useState } from 'react';
-import { Box, ListItemText, Menu, MenuItem, Tooltip } from '@mui/material';
+import { Box, ButtonBase, Collapse, ListItemText, Menu, MenuItem, Tooltip } from '@mui/material';
 import { useTranslation } from 'react-i18next';
 import type { Thread } from '../../client';
+import { CopyIconButton } from '@tingly/ui';
 import { fontMono, fontSizes } from '@tingly/ui/theme/fonts';
-import { AutoFixHigh, Branch, Check, ExpandMore, FolderOpen } from '../icons';
-import { useCopyFeedback } from '../../hooks/useCopyFeedback';
+import { AutoFixHigh, Branch, Check, ExpandLess, ExpandMore, FolderOpen } from '../icons';
 import { folderName } from '../../utils/format';
+import { readLocal, writeLocal } from '../../utils/storage';
 
 export type AutoAnswer = 'off' | 'delay' | 'now';
 const AUTO_ANSWERS: AutoAnswer[] = ['off', 'delay', 'now'];
+const OPEN_KEY = 'thread.strip.open';
 
 /**
  * The setting a thread's questions follow: its own, else delay for a
@@ -21,90 +23,109 @@ export function autoAnswerOf(thread: Thread): AutoAnswer {
     return thread.project_id ? 'delay' : 'off';
 }
 
-/** One floating piece of the strip: quiet, rounded, a button when it acts. */
-function Pill({ title, onClick, label, children }: { title: React.ReactNode; onClick?: (e: React.MouseEvent<HTMLElement>) => void; label: string; children: React.ReactNode }) {
+const clip = { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 } as const;
+const ROW_H = 30;
+
+/** One fact on its own line: icon, name, value, and its action at the end. */
+function Row({ icon, name, children, action }: { icon: React.ReactNode; name: string; children: React.ReactNode; action?: React.ReactNode }) {
     return (
-        <Tooltip title={title}>
-            <Box
-                component={onClick ? 'button' : 'span'}
-                type={onClick ? 'button' : undefined}
-                aria-label={label}
-                onClick={onClick}
-                sx={{
-                    display: 'inline-flex', alignItems: 'center', gap: 0.5, minWidth: 0, maxWidth: '100%',
-                    px: 1, py: 0.375, borderRadius: 1, border: 1, borderColor: 'divider',
-                    bgcolor: 'background.paper', color: 'text.secondary', font: 'inherit', fontSize: fontSizes.sm, lineHeight: 1.4,
-                    boxShadow: '0 1px 4px rgba(0,0,0,0.04)',
-                    cursor: onClick ? 'pointer' : 'default',
-                    '&:hover': onClick ? { color: 'text.primary', bgcolor: 'action.hover' } : undefined,
-                    '&:focus-visible': { outline: 2, outlineColor: 'primary.main', outlineOffset: 1 },
-                    '& svg': { fontSize: 14, flexShrink: 0 },
-                }}
-            >
-                {children}
-            </Box>
-        </Tooltip>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minHeight: ROW_H, px: 1.25, minWidth: 0, '& > svg': { fontSize: 15, flexShrink: 0, color: 'text.secondary' } }}>
+            {icon}
+            <Box component="span" sx={{ width: 84, flexShrink: 0, color: 'text.secondary', whiteSpace: 'nowrap' }}>{name}</Box>
+            <Box sx={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 0.75, color: 'text.primary' }}>{children}</Box>
+            {action}
+        </Box>
     );
 }
 
-const clip = { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 } as const;
-
 interface Props {
     thread: Thread;
-    /** Saves the auto-answer setting; the strip hides the picker without it. */
+    /** Saves the auto-answer setting; the row is left out without it. */
     onAutoAnswer?: (mode: AutoAnswer) => void;
 }
 
 /**
- * What a thread runs in and how it treats its questions, floating right
- * above the message box: where to look while writing to it. Each fact is
- * its own piece, so more (a pull request, CI) can join the row later.
+ * What a thread runs in and how it treats its questions, in a panel right
+ * above the message box: one fact per line, so a new one (a pull request,
+ * CI) is one more line. Folded, it is a single line naming them all; the
+ * choice is remembered per browser.
  */
 export function ComposerStrip({ thread, onAutoAnswer }: Props) {
     const { t } = useTranslation('projects');
-    const cd = useCopyFeedback();
-    const name = useCopyFeedback();
+    const [open, setOpenState] = useState(() => readLocal(OPEN_KEY) === '1');
+    const setOpen = (v: boolean) => {
+        setOpenState(v);
+        writeLocal(OPEN_KEY, v ? '1' : '0');
+    };
     const [menu, setMenu] = useState<HTMLElement | null>(null);
     const branch = thread.branch || thread.head_branch;
     const mode = autoAnswerOf(thread);
     const own = (thread.auto_answer ?? '') !== '';
+    const showAuto = !!onAutoAnswer && thread.status !== 'resolved';
+    if (!thread.worktree && !branch && !showAuto) return null;
+
+    const summary = [
+        thread.worktree && <Box key="f" component="span" sx={{ ...clip, display: 'inline-flex', alignItems: 'center', gap: 0.5, flexShrink: 1 }}><FolderOpen sx={{ fontSize: 14 }} /><Box component="span" sx={{ ...clip, fontFamily: fontMono }}>{folderName(thread.worktree)}</Box></Box>,
+        branch && <Box key="b" component="span" sx={{ ...clip, display: 'inline-flex', alignItems: 'center', gap: 0.5, flexShrink: 2 }}><Branch sx={{ fontSize: 14 }} /><Box component="span" sx={{ ...clip, fontFamily: fontMono }}>{branch}</Box></Box>,
+        showAuto && <Box key="a" component="span" sx={{ ...clip, display: 'inline-flex', alignItems: 'center', gap: 0.5, flexShrink: 0 }}><AutoFixHigh sx={{ fontSize: 14, color: mode === 'off' ? 'inherit' : 'primary.main' }} />{t(`strip.autoAnswer.${mode}`)}</Box>,
+    ].filter(Boolean);
 
     return (
-        <Box data-testid="composer-strip" sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75, mb: 0.75, minWidth: 0 }}>
-            {thread.worktree && (
-                <Pill label={t('strip.folder')} onClick={() => void cd.copy(`cd ${thread.worktree}`)}
-                    title={<><Box sx={{ fontFamily: fontMono }}>{thread.worktree}</Box>{cd.copied ? t('common.copied') : t('strip.copyCd')}</>}>
-                    {cd.copied ? <Check /> : <FolderOpen />}
-                    <Box component="span" sx={{ ...clip, fontFamily: fontMono }}>{folderName(thread.worktree)}</Box>
-                </Pill>
-            )}
-            {branch && (
-                <Pill label={t('strip.branch')} onClick={() => void name.copy(branch)}
-                    title={<>{thread.base_branch && thread.branch ? <Box>{t('thread.fromBase', { base: thread.base_branch })}</Box> : null}{name.copied ? t('common.copied') : t('strip.copyBranch')}</>}>
-                    {name.copied ? <Check /> : <Branch />}
-                    <Box component="span" sx={{ ...clip, fontFamily: fontMono }}>{branch}</Box>
-                </Pill>
-            )}
-            {onAutoAnswer && thread.status !== 'resolved' && (
-                <>
-                    <Pill label={t('strip.autoAnswer.title')} onClick={(e) => setMenu(e.currentTarget)} title={t(`strip.autoAnswer.${mode}Help`)}>
-                        <AutoFixHigh sx={{ color: mode === 'off' ? 'inherit' : 'primary.main' }} />
-                        <Box component="span" sx={clip}>{t('strip.autoAnswer.chip', { value: t(`strip.autoAnswer.${mode}`) })}</Box>
-                        <ExpandMore />
-                    </Pill>
-                    <Menu anchorEl={menu} open={!!menu} onClose={() => setMenu(null)}
-                        anchorOrigin={{ vertical: 'top', horizontal: 'left' }} transformOrigin={{ vertical: 'bottom', horizontal: 'left' }}
-                        slotProps={{ paper: { sx: { maxWidth: 340 } } }}>
-                        <Box sx={{ px: 2, pt: 0.5, pb: 0.75, fontSize: fontSizes.sm, color: 'text.secondary' }}>{t('strip.autoAnswer.menuTitle')}</Box>
-                        {AUTO_ANSWERS.map((m) => (
-                            <MenuItem key={m} selected={m === mode} onClick={() => { setMenu(null); if (m !== mode || !own) onAutoAnswer(m); }} sx={{ alignItems: 'flex-start', gap: 1 }}>
-                                <Box sx={{ width: 16, pt: 0.25, flexShrink: 0 }}>{m === mode && <Check sx={{ fontSize: 16 }} />}</Box>
-                                <ListItemText primary={t(`strip.autoAnswer.${m}`)} secondary={t(`strip.autoAnswer.${m}Help`)}
-                                    slotProps={{ primary: { sx: { fontSize: '0.875rem' } }, secondary: { sx: { whiteSpace: 'normal', fontSize: fontSizes.sm } } }} />
-                            </MenuItem>
-                        ))}
-                    </Menu>
-                </>
+        <Box data-testid="composer-strip" sx={{ mb: 0.75, borderRadius: 1.5, bgcolor: 'action.hover', fontSize: fontSizes.sm, lineHeight: 1.4, color: 'text.secondary', overflow: 'hidden' }}>
+            {/* Folded: one line naming every fact; the whole line unfolds it. */}
+            <ButtonBase
+                onClick={() => setOpen(!open)}
+                aria-expanded={open}
+                aria-label={t(open ? 'strip.collapse' : 'strip.expand')}
+                sx={{ width: '100%', display: 'flex', alignItems: 'center', gap: 1.25, minHeight: ROW_H, px: 1.25, justifyContent: 'flex-start', font: 'inherit', color: 'inherit', textAlign: 'left', '&:hover': { color: 'text.primary' } }}
+            >
+                {open
+                    ? <Box component="span" sx={{ flex: 1, fontWeight: 600 }}>{t(thread.project_id ? 'strip.title' : 'strip.sessionTitle')}</Box>
+                    : <Box component="span" sx={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 1.25, overflow: 'hidden' }}>{summary}</Box>}
+                {open ? <ExpandMore sx={{ fontSize: 16 }} /> : <ExpandLess sx={{ fontSize: 16 }} />}
+            </ButtonBase>
+            <Collapse in={open} unmountOnExit>
+                <Box sx={{ pb: 0.5 }}>
+                    {thread.worktree && (
+                        <Row icon={<FolderOpen />} name={t('strip.folder')}
+                            action={<CopyIconButton value={`cd ${thread.worktree}`} label={t('strip.copyCd')} copiedLabel={t('common.copied')} iconSize={14} sx={{ p: 0.25 }} />}>
+                            {/* A long path keeps its end, the part that tells folders apart. */}
+                            <Box component="span" title={thread.worktree} sx={{ ...clip, fontFamily: fontMono, direction: 'rtl', textAlign: 'left' }}><bdi>{thread.worktree}</bdi></Box>
+                        </Row>
+                    )}
+                    {branch && (
+                        <Row icon={<Branch />} name={t('strip.branch')}
+                            action={<CopyIconButton value={branch} label={t('strip.copyBranch')} copiedLabel={t('common.copied')} iconSize={14} sx={{ p: 0.25 }} />}>
+                            <Box component="span" sx={{ ...clip, fontFamily: fontMono }}>{branch}</Box>
+                            {thread.branch && thread.base_branch && <Box component="span" sx={{ ...clip, flexShrink: 0, color: 'text.secondary' }}>{t('thread.fromBase', { base: thread.base_branch })}</Box>}
+                        </Row>
+                    )}
+                    {showAuto && (
+                        <Row icon={<AutoFixHigh sx={{ color: mode === 'off' ? undefined : 'primary.main' }} />} name={t('strip.autoAnswer.title')}>
+                            <Tooltip title={t(`strip.autoAnswer.${mode}Help`)}>
+                                <ButtonBase onClick={(e) => setMenu(e.currentTarget)} aria-label={t('strip.autoAnswer.change')}
+                                    sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.25, px: 0.75, ml: -0.75, py: 0.25, borderRadius: 1, font: 'inherit', color: 'text.primary', '&:hover': { bgcolor: 'action.selected' } }}>
+                                    {t(`strip.autoAnswer.${mode}`)}
+                                    <ExpandMore sx={{ fontSize: 15, color: 'text.secondary' }} />
+                                </ButtonBase>
+                            </Tooltip>
+                        </Row>
+                    )}
+                </Box>
+            </Collapse>
+            {onAutoAnswer && (
+                <Menu anchorEl={menu} open={!!menu} onClose={() => setMenu(null)}
+                    anchorOrigin={{ vertical: 'top', horizontal: 'right' }} transformOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+                    slotProps={{ paper: { sx: { maxWidth: 340 } } }}>
+                    <Box sx={{ px: 2, pt: 0.5, pb: 0.75, fontSize: fontSizes.sm, color: 'text.secondary' }}>{t('strip.autoAnswer.menuTitle')}</Box>
+                    {AUTO_ANSWERS.map((m) => (
+                        <MenuItem key={m} selected={m === mode} onClick={() => { setMenu(null); if (m !== mode || !own) onAutoAnswer(m); }} sx={{ alignItems: 'flex-start', gap: 1 }}>
+                            <Box sx={{ width: 16, pt: 0.25, flexShrink: 0 }}>{m === mode && <Check sx={{ fontSize: 16 }} />}</Box>
+                            <ListItemText primary={t(`strip.autoAnswer.${m}`)} secondary={t(`strip.autoAnswer.${m}Help`)}
+                                slotProps={{ primary: { sx: { fontSize: '0.875rem' } }, secondary: { sx: { whiteSpace: 'normal', fontSize: fontSizes.sm } } }} />
+                        </MenuItem>
+                    ))}
+                </Menu>
             )}
         </Box>
     );

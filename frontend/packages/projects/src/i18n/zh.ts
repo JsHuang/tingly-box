@@ -133,9 +133,10 @@ export const zh: Dict<typeof en> = {
     },
     attachments: { removed: '{{name}}（已移除）' },
     strip: {
-        folder: '文件夹', copyCd: '点击复制 cd 命令', branch: '分支', copyBranch: '点击复制分支名',
+        title: '本线程', sessionTitle: '本会话', expand: '展开详情', collapse: '收起详情',
+        folder: '文件夹', copyCd: '复制 cd 命令', branch: '分支', copyBranch: '复制分支名',
         autoAnswer: {
-            title: '自动回答', chip: '自动回答：{{value}}', menuTitle: '问题带有推荐答案时',
+            title: '自动回答', change: '更改', menuTitle: '问题带有推荐答案时',
             off: '关闭', offHelp: '每个问题都等你回答。',
             delay: '10 分钟后', delayHelp: '10 分钟内没回答，线程就按推荐答案继续工作。',
             now: '立即', nowHelp: '线程立即按推荐答案继续。之后仍可以发消息纠正。',
