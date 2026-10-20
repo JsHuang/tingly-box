@@ -1,4 +1,5 @@
 import {
+    Alert,
     Box,
     Divider,
     MenuItem,
@@ -14,6 +15,7 @@ import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { type AppLanguage, resolveLanguage } from '@/i18n';
 import { fontMono, fontSizes } from '@/theme/fonts';
+import { CODEX_COMPACT, planCodexCompact } from '@/components/rule-card/codexCompact';
 
 // CodexPrefs mirrors the Go struct in internal/config (CodexPrefs).
 // Keys are the literal Codex config.toml keys so the object round-trips
@@ -236,6 +238,56 @@ function useLang(): AppLanguage {
     return resolveLanguage(i18n.language);
 }
 
+// ── Auto-compact warnings ──────────────────────────────────────────────
+// The shared default is judged against the default 200K window; a rule that
+// sets the 1M flag has far more room (the Compact chip on its header judges it
+// against its own window).
+
+const COMPACT_WARN_TEXT: Record<AppLanguage, { low: string; limited: string; over: string }> = {
+    zh: {
+        low: '按 200K 窗口估算，压缩时仅剩约 {remain} tokens（建议不低于 {min}）。长工具输出可能撞上窗口上限，导致压缩失败。',
+        limited: '高于「可用窗口 {effective}%」，实际按 {applied}% 生效。要更晚压缩，请先调高可用窗口。',
+        over: '{value}% 超过 Codex 上限 90%，Codex 会忽略它。应用时将按 {applied}% 写入。',
+    },
+    en: {
+        low: 'On a 200K window only about {remain} tokens would be free when compacting (at least {min} recommended). A long tool output could overflow the window and make compaction fail.',
+        limited: 'Higher than the usable window ({effective}%), so {applied}% is what takes effect. To compact later, raise the usable window first.',
+        over: '{value}% is above Codex\'s 90% ceiling, which Codex ignores. {applied}% will be written when you apply.',
+    },
+    ru: {
+        low: 'На окне 200K при сжатии останется около {remain} токенов (рекомендуется не менее {min}). Длинный вывод инструмента может переполнить окно, и сжатие не удастся.',
+        limited: 'Выше доступного окна ({effective}%), поэтому действует {applied}%. Чтобы сжимать позже, сначала увеличьте доступное окно.',
+        over: '{value}% выше предела Codex в 90%, и Codex это значение игнорирует. При применении будет записано {applied}%.',
+    },
+};
+
+const parseCompactPercent = (raw: string | undefined, fallback: number): number => {
+    const n = Number.parseInt(raw ?? '', 10);
+    return Number.isFinite(n) && n >= CONTEXT_PERCENT_MIN && n <= CONTEXT_PERCENT_MAX ? n : fallback;
+};
+
+/** The warning for the shared auto-compact percent, or null when it is fine. */
+export function compactDefaultWarning(
+    prefs: CodexPrefs,
+    text: { low: string; limited: string; over: string },
+): { severity: 'warning' | 'info' | 'error'; message: string } | null {
+    const effective = parseCompactPercent(prefs.effective_context_window_percent, CONTEXT_PERCENT_DEFAULTS.effective_context_window_percent);
+    const percent = parseCompactPercent(prefs.auto_compact_percent, CONTEXT_PERCENT_DEFAULTS.auto_compact_percent);
+    const plan = planCodexCompact({ window: CODEX_COMPACT.window, percent, effectivePercent: effective });
+    const fill = (tpl: string) => tpl
+        .replace('{value}', String(percent))
+        .replace('{applied}', String(plan.applied))
+        .replace('{effective}', String(effective))
+        .replace('{remain}', plan.remain.toLocaleString('en-US'))
+        .replace('{min}', CODEX_COMPACT.minRemaining.toLocaleString('en-US'));
+    switch (plan.status) {
+        case 'over': return { severity: 'error', message: fill(text.over) };
+        case 'limited': return { severity: 'info', message: fill(text.limited) };
+        case 'low': return { severity: 'warning', message: fill(text.low) };
+        default: return null;
+    }
+}
+
 // ── Field row ──────────────────────────────────────────────────────────
 
 interface FieldRowProps {
@@ -257,7 +309,11 @@ const FieldRow: React.FC<FieldRowProps> = ({ field, text, unsetLabel, prefs, set
         </Box>
     );
 
+    const lang = useLang();
+    const warning = field.key === 'auto_compact_percent' ? compactDefaultWarning(prefs, COMPACT_WARN_TEXT[lang]) : null;
+
     return (
+        <Box>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, py: 1, minHeight: 44 }}>
             {/* Col 1 — Label + info icon */}
             <Box sx={{ flex: '0 0 180px', display: 'flex', alignItems: 'center', gap: 0.5, minWidth: 0 }}>
@@ -325,6 +381,12 @@ const FieldRow: React.FC<FieldRowProps> = ({ field, text, unsetLabel, prefs, set
                     </Select>
                 )}
             </Box>
+        </Box>
+        {warning && (
+            <Alert severity={warning.severity} variant="outlined" sx={{ mb: 1, py: 0, fontSize: fontSizes.sm }}>
+                {warning.message}
+            </Alert>
+        )}
         </Box>
     );
 };

@@ -299,6 +299,11 @@ pipeline, so it is deliberately not in `RuleFlagRegistry` (see `rule-flags.md`).
   clamp is what is written.
 - **Read-back.** With overrides present the catalog no longer has one compact
   value, so `ReadCodexConfig` restores the most common one as the shared value.
+- **Auto Config warns about the shared value too.** Under "Auto-compact at" the
+  Quick tab shows the same judgement for the shared percent against the default
+  200K window (a rule with the `1M` flag is judged on its own chip): an error
+  above 90, an info line when the usable window cuts it down, a warning when
+  under 40,000 tokens would remain. Typed values only; nothing is rewritten.
 - **Not covered.** The agent-apply bridge (`ai/agent`, CLI/IM apply) renders its
   own catalog from default prefs and, like the `1M` window, does not carry rule
   overrides; the UI "Auto Config" path does. Whether the 40,000 threshold is
