@@ -295,13 +295,11 @@ export default {
       "title": "Auto-compact trigger",
       "description": "Codex compacts the conversation once the context reaches this share of the window. It only goes into the Codex config; requests are not affected.",
       "following": "Following Auto Config ({{percent}}%). Drag to set a value for this model only.",
-      "ceiling": "Max {{value}}%",
       "window": "Window",
       "line": "Compacts at",
       "remain": "Free when compacting",
       "low": "Only about {{remain}} tokens will be free when compacting (at least {{min}} recommended). A long tool output could overflow the window and make compaction fail.",
       "limited": "Capped by the usable window ({{effective}}%), so {{applied}}% is what takes effect. To compact later, raise Usable window in Auto Config.",
-      "over": "The stored {{value}}% is above Codex's 90% ceiling, which Codex ignores. {{applied}}% will be written when you apply.",
       "needsApply": "Takes effect after Auto Config is applied.",
       "reset": "Use Auto Config value ({{percent}}%)"
     }

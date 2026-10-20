@@ -906,7 +906,7 @@ func TestRenderCodexModelCatalog_HeadroomFromPrefs(t *testing.T) {
 }
 
 // A rule's codex_compact_percent overrides the shared default for that model
-// only; results stay inside the usable window and Codex's 90% ceiling.
+// only; results stay inside the usable window.
 func TestRenderCodexModelCatalog_PerModelCompactPercent(t *testing.T) {
 	raw, err := RenderCodexModelCatalogWithPrefs(
 		[]string{"plain", "tuned", "high", "tooLow"},
@@ -930,7 +930,7 @@ func TestRenderCodexModelCatalog_PerModelCompactPercent(t *testing.T) {
 	}
 	assert.Equal(t, 75, got["plain"], "no override follows the shared default")
 	assert.Equal(t, 60, got["tuned"])
-	assert.Equal(t, 90, got["high"], "capped at Codex's 90% ceiling")
+	assert.Equal(t, 95, got["high"], "capped at the usable window")
 	assert.Equal(t, 75, got["tooLow"], "out-of-range override is ignored")
 }
 

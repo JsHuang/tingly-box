@@ -38,10 +38,9 @@ const parsePercent = (raw: unknown, fallback: number): number => {
     return Number.isFinite(n) && n >= CODEX_COMPACT.min && n <= 100 ? n : fallback;
 };
 
-const NOTE_COLOR: Record<Exclude<CodexCompactStatus, 'ok'>, 'warning' | 'info' | 'error'> = {
+const NOTE_COLOR: Record<Exclude<CodexCompactStatus, 'ok'>, 'warning' | 'info'> = {
     low: 'warning',
     limited: 'info',
-    over: 'error',
 };
 
 /**
@@ -120,7 +119,6 @@ export const CodexCompactChip: React.FC<CodexCompactChipProps> = ({
     const noteText = {
         low: t('ruleHeader.compact.low', { remain: fmt(plan.remain), min: fmt(CODEX_COMPACT.minRemaining) }),
         limited: t('ruleHeader.compact.limited', { effective: shared.effective, applied: plan.applied }),
-        over: t('ruleHeader.compact.over', { value: shown, applied: plan.applied }),
         ok: '',
     }[plan.status];
 
@@ -168,32 +166,27 @@ export const CodexCompactChip: React.FC<CodexCompactChipProps> = ({
 
                     <Box>
                         <Box sx={{ position: 'relative', px: 0.5 }}>
-                            {/* Rail, the "too few tokens left" zone and the unselectable zone above Codex's ceiling. */}
+                            {/* Rail and the "too few tokens left" zone. */}
                             <Box sx={{ position: 'absolute', left: 4, right: 4, top: '50%', height: 4, mt: '-2px', borderRadius: 2, bgcolor: 'action.disabledBackground', overflow: 'hidden' }}>
                                 {lowStart !== null && (
                                     <Box sx={{
                                         position: 'absolute', top: 0, bottom: 0,
                                         left: `${trackPosition(lowStart)}%`,
-                                        width: `${trackPosition(CODEX_COMPACT.max) - trackPosition(lowStart)}%`,
+                                        right: 0,
                                         bgcolor: (theme) => alpha(theme.palette.warning.main, 0.55),
                                     }} />
                                 )}
-                                <Box sx={{
-                                    position: 'absolute', top: 0, bottom: 0,
-                                    left: `${trackPosition(CODEX_COMPACT.max)}%`, right: 0,
-                                    backgroundImage: (theme) => `repeating-linear-gradient(135deg, ${alpha(theme.palette.text.disabled, 0.5)} 0 3px, transparent 3px 6px)`,
-                                }} />
                             </Box>
                             <Slider
                                 size="small"
                                 min={CODEX_COMPACT.min}
-                                max={100}
+                                max={CODEX_COMPACT.max}
                                 step={1}
-                                value={Math.min(shown, 100)}
+                                value={shown}
                                 disabled={disabled}
-                                onChange={(_, v) => setDraft(Math.min(v as number, CODEX_COMPACT.max))}
+                                onChange={(_, v) => setDraft(v as number)}
                                 onChangeCommitted={(_, v) => {
-                                    const next = Math.min(v as number, CODEX_COMPACT.max);
+                                    const next = v as number;
                                     setDraft(next);
                                     commit(next);
                                 }}
@@ -204,9 +197,11 @@ export const CodexCompactChip: React.FC<CodexCompactChipProps> = ({
                         </Box>
                         <Box sx={{ position: 'relative', height: 16, fontSize: fontSizes.xs, color: 'text.secondary', fontVariantNumeric: 'tabular-nums' }}>
                             <span style={{ position: 'absolute', left: 0 }}>{CODEX_COMPACT.min}%</span>
-                            <span style={{ position: 'absolute', right: `${100 - trackPosition(CODEX_COMPACT.max)}%`, marginRight: -6 }}>
-                                {t('ruleHeader.compact.ceiling', { value: CODEX_COMPACT.max })}
-                            </span>
+                            {lowStart !== null && (
+                                <span style={{ position: 'absolute', left: `${trackPosition(lowStart)}%`, transform: 'translateX(-50%)' }}>
+                                    {Math.round(lowStart)}%
+                                </span>
+                            )}
                             <span style={{ position: 'absolute', right: 0 }}>100%</span>
                         </Box>
                     </Box>

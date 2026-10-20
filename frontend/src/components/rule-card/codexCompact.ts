@@ -1,23 +1,24 @@
 // Mirrors the Codex catalog rules in internal/config/apply_config_codex.go
-// (codexMaxAutoCompactPercent, codexEffectiveContextWindowPercent,
+// (codexEffectiveContextWindowPercent,
 // codexDefaultAutoCompactTokenLimitPct, the 200K / 1M windows). The server is
 // the source of truth for what is written; this only previews it while a
 // slider is dragged, so keep the numbers in sync.
 
 export const CODEX_COMPACT = {
     min: 50,
-    // Codex ignores an auto-compact limit above 90% of the context window.
-    max: 90,
+    max: 100,
     defaultPercent: 75,
     defaultEffectivePercent: 82,
     window: 200_000,
     window1M: 1_000_000,
     // Below this many tokens left at compaction time there is too little room
-    // for the summary request, system prompt, tool output and the reply.
-    minRemaining: 40_000,
+    // for the summary request, system prompt, tool output and the reply. It is
+    // the practical limit seen in use: 82% of a 200K window. Not a hard cap,
+    // only where warnings start; larger windows reach it at a higher percent.
+    minRemaining: 36_000,
 } as const;
 
-export type CodexCompactStatus = 'ok' | 'low' | 'limited' | 'over';
+export type CodexCompactStatus = 'ok' | 'low' | 'limited';
 
 export interface CodexCompactPlan {
     /** The percent that ends up in the catalog. */
@@ -30,9 +31,8 @@ export interface CodexCompactPlan {
 }
 
 /**
- * Resolves what a chosen percent turns into. `over` = the stored value is above
- * Codex's ceiling (read back from an old config), `limited` = it exceeds the
- * usable window so it is cut down, `low` = it leaves too few tokens.
+ * Resolves what a chosen percent turns into. `limited` = it exceeds the usable
+ * window so it is cut down, `low` = it leaves too few tokens.
  */
 export function planCodexCompact(opts: {
     window: number;
@@ -40,12 +40,11 @@ export function planCodexCompact(opts: {
     effectivePercent?: number;
 }): CodexCompactPlan {
     const effective = opts.effectivePercent ?? CODEX_COMPACT.defaultEffectivePercent;
-    const applied = Math.min(opts.percent, CODEX_COMPACT.max, effective);
+    const applied = Math.min(opts.percent, effective);
     const line = Math.floor((opts.window * applied) / 100);
     const remain = opts.window - line;
     let status: CodexCompactStatus = 'ok';
-    if (opts.percent > CODEX_COMPACT.max) status = 'over';
-    else if (opts.percent > applied) status = 'limited';
+    if (opts.percent > applied) status = 'limited';
     else if (remain < CODEX_COMPACT.minRemaining) status = 'low';
     return { applied, line, remain, status };
 }
@@ -56,7 +55,7 @@ export function trackPosition(percent: number): number {
     return ((clamped - CODEX_COMPACT.min) / (100 - CODEX_COMPACT.min)) * 100;
 }
 
-/** Where the "too few tokens left" zone starts, or null when it lies beyond the ceiling. */
+/** Where the "too few tokens left" zone starts, or null when it lies beyond the track. */
 export function lowZoneStart(window: number): number | null {
     const start = (1 - CODEX_COMPACT.minRemaining / window) * 100;
     return start < CODEX_COMPACT.max ? start : null;

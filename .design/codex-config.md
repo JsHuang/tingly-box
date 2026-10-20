@@ -281,32 +281,34 @@ the catalog is rendered (`BuildCompactPercentsFromRules` → `CodexPrefs.ModelAu
 `json:"-"` so a request can never set it) and never enters the request
 pipeline, so it is deliberately not in `RuleFlagRegistry` (see `rule-flags.md`).
 
-- **Ceiling.** Whatever the source, a catalog entry's compact percent is
-  `min(percent, usable-window percent, 90)`. Codex is reported to ignore an
-  auto-compact limit above 90% of the window (third-party write-ups, to be
-  confirmed against Codex itself), so nothing above 90 is written.
+- **Ceiling.** A catalog entry's compact percent is `min(percent, usable-window
+  percent)`. Codex is reported to ignore an auto-compact limit above 90% of the
+  window (third-party write-ups, unconfirmed), but that is deliberately not
+  enforced: the practical limit in use is lower than that anyway (see below), so
+  the warnings carry the guidance and nothing is clamped at 90.
 - **Editor.** A `Compact: 75% ▾` chip on the Codex rule header, next to `1M` and
   `Endpoint`, opens a popover with a slider (`CodexCompactChip`). Unset reads
   `Compact: Auto` and the popover shows the Auto Config value it follows; moving
   the slider sets the override, "use Auto Config value" clears it.
 - **Warning is about tokens left, not a fixed percent.** What compaction needs
   (summary request, system prompt, tool output, the reply) is roughly constant,
-  so the popover warns when fewer than 40,000 tokens would remain, using the
-  window the rule really has (1M with the `1M` flag, else 200K). Three other
-  states are explained instead of silently applied: the usable-window cut-down,
-  a stored value above 90, and the unchanged 90 ceiling on the slider.
+  so the popover warns when fewer than 36,000 tokens would remain, using the
+  window the rule really has (1M with the `1M` flag, else 200K). 36,000 is the
+  empirical limit: 82% of a 200K window. Larger windows reach it at a higher
+  percent (96.4% on 1M). It is where warnings start, not a cap. The usable-window
+  cut-down is explained instead of silently applied.
   `codexCompact.ts` mirrors the Go constants for the live preview; the server's
   clamp is what is written.
 - **Read-back.** With overrides present the catalog no longer has one compact
   value, so `ReadCodexConfig` restores the most common one as the shared value.
 - **Auto Config warns about the shared value too.** Under "Auto-compact at" the
   Quick tab shows the same judgement for the shared percent against the default
-  200K window (a rule with the `1M` flag is judged on its own chip): an error
-  above 90, an info line when the usable window cuts it down, a warning when
-  under 40,000 tokens would remain. Typed values only; nothing is rewritten.
+  200K window (a rule with the `1M` flag is judged on its own chip): an info line
+  when the usable window cuts it down, a warning when under 36,000 tokens would
+  remain. Typed values only; nothing is rewritten.
 - **Not covered.** The agent-apply bridge (`ai/agent`, CLI/IM apply) renders its
   own catalog from default prefs and, like the `1M` window, does not carry rule
-  overrides; the UI "Auto Config" path does. Whether the 40,000 threshold is
+  overrides; the UI "Auto Config" path does. Whether the 36,000 threshold is
   right still wants a real long-session check against Codex.
 
 ## Schema alignment: `supports_reasoning_summaries` (2026-10-19)

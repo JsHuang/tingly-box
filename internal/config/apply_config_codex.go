@@ -78,10 +78,6 @@ const codexLegacySupportsSummariesKey = "model_supports_reasoning_summaries"
 const (
 	codexMinContextPercent = 50
 	codexMaxContextPercent = 100
-
-	// Codex ignores an auto-compact limit above 90% of the context window, so
-	// nothing higher is ever written to the catalog.
-	codexMaxAutoCompactPercent = 90
 )
 
 // contextHeadroom resolves the effective-window and auto-compact percentages,
@@ -94,12 +90,12 @@ func (p *CodexPrefs) contextHeadroom() (effective, compact int) {
 		effective = codexParsePercent(p.EffectiveContextWindowPercent, effective)
 		compact = codexParsePercent(p.AutoCompactPercent, compact)
 	}
-	return effective, min(compact, effective, codexMaxAutoCompactPercent)
+	return effective, min(compact, effective)
 }
 
 // modelCompactPercent resolves one model's auto-compact percentage: the
 // rule-level override when it is in range, else the shared default. The result
-// never exceeds the usable window (effective) nor Codex's own ceiling.
+// never exceeds the usable window (effective).
 func (p *CodexPrefs) modelCompactPercent(model string, effective, fallback int) int {
 	pct := fallback
 	if p != nil {
@@ -107,7 +103,7 @@ func (p *CodexPrefs) modelCompactPercent(model string, effective, fallback int) 
 			pct = v
 		}
 	}
-	return min(pct, effective, codexMaxAutoCompactPercent)
+	return min(pct, effective)
 }
 
 func codexParsePercent(raw string, fallback int) int {

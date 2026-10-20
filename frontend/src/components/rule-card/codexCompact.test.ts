@@ -10,9 +10,10 @@ describe('planCodexCompact', () => {
         });
     });
 
-    it('warns when fewer than 40K tokens would remain', () => {
-        const plan = planCodexCompact({ window, percent: 82, effectivePercent: 95 });
-        expect(plan.remain).toBe(36_000);
+    it('82% of 200K is the limit: at it no warning, above it a warning', () => {
+        expect(planCodexCompact({ window, percent: 82, effectivePercent: 95 }).status).toBe('ok');
+        const plan = planCodexCompact({ window, percent: 85, effectivePercent: 95 });
+        expect(plan.remain).toBe(30_000);
         expect(plan.status).toBe('low');
     });
 
@@ -26,16 +27,16 @@ describe('planCodexCompact', () => {
         expect(plan.status).toBe('limited');
     });
 
-    it('flags values above the Codex ceiling and writes the ceiling', () => {
-        const plan = planCodexCompact({ window, percent: 100, effectivePercent: 100 });
-        expect(plan.applied).toBe(90);
-        expect(plan.status).toBe('over');
+    it('does not impose Codex\'s 90% ceiling, only the usable window', () => {
+        const plan = planCodexCompact({ window: window1M, percent: 95, effectivePercent: 100 });
+        expect(plan.applied).toBe(95);
+        expect(plan.status).toBe('ok');
     });
 });
 
 describe('lowZoneStart', () => {
-    it('starts at 80% on 200K and does not exist on 1M', () => {
-        expect(lowZoneStart(window)).toBeCloseTo(80);
-        expect(lowZoneStart(window1M)).toBeNull();
+    it('starts at 82% on 200K and at 96.4% on 1M', () => {
+        expect(lowZoneStart(window)).toBeCloseTo(82);
+        expect(lowZoneStart(window1M)).toBeCloseTo(96.4);
     });
 });

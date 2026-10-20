@@ -140,7 +140,7 @@ const FIELDS_TEXT_ZH: FieldTextMap = {
     auto_compact_percent: {
         label: '自动压缩阈值 (%)',
         purpose: '上下文用到窗口的这个比例时触发自动压缩',
-        tooltip: '写入模型目录的 auto_compact_token_limit（窗口 × 比例），范围 50–100，且不会高于可用窗口比例，也不会超过 Codex 自身的 90% 上限。留空用 tb 默认（75）。这是所有模型的默认值，单个模型可在规则行的“压缩”芯片里覆盖。',
+        tooltip: '写入模型目录的 auto_compact_token_limit（窗口 × 比例），范围 50–100，且不会高于可用窗口比例。留空用 tb 默认（75）。这是所有模型的默认值，单个模型可在规则行的“压缩”芯片里覆盖。',
     },
 };
 
@@ -173,7 +173,7 @@ const FIELDS_TEXT_EN: FieldTextMap = {
     auto_compact_percent: {
         label: 'Auto-compact at (%)',
         purpose: 'Compact the conversation once context reaches this share of the window',
-        tooltip: 'Written to the catalog as auto_compact_token_limit (window × percent), range 50–100, never above the usable window or Codex\'s own 90% ceiling. Empty = tb default (75). This is the default for every model; a single model can override it with the Compact chip on its rule row.',
+        tooltip: 'Written to the catalog as auto_compact_token_limit (window × percent), range 50–100, never above the usable window Empty = tb default (75). This is the default for every model; a single model can override it with the Compact chip on its rule row.',
     },
 };
 
@@ -206,7 +206,7 @@ const FIELDS_TEXT_RU: FieldTextMap = {
     auto_compact_percent: {
         label: 'Автосжатие при (%)',
         purpose: 'Сжимать диалог, когда контекст достигает этой доли окна',
-        tooltip: 'Записывается в каталог как auto_compact_token_limit (окно × доля), диапазон 50–100, не выше доступного окна и не выше собственного предела Codex в 90%. Пусто — значение tb по умолчанию (75). Это значение по умолчанию для всех моделей; для отдельной модели его можно переопределить чипом «Сжатие» в строке правила.',
+        tooltip: 'Записывается в каталог как auto_compact_token_limit (окно × доля), диапазон 50–100, не выше доступного окна Пусто — значение tb по умолчанию (75). Это значение по умолчанию для всех моделей; для отдельной модели его можно переопределить чипом «Сжатие» в строке правила.',
     },
 };
 
@@ -243,21 +243,18 @@ function useLang(): AppLanguage {
 // sets the 1M flag has far more room (the Compact chip on its header judges it
 // against its own window).
 
-const COMPACT_WARN_TEXT: Record<AppLanguage, { low: string; limited: string; over: string }> = {
+const COMPACT_WARN_TEXT: Record<AppLanguage, { low: string; limited: string }> = {
     zh: {
         low: '按 200K 窗口估算，压缩时仅剩约 {remain} tokens（建议不低于 {min}）。长工具输出可能撞上窗口上限，导致压缩失败。',
         limited: '高于「可用窗口 {effective}%」，实际按 {applied}% 生效。要更晚压缩，请先调高可用窗口。',
-        over: '{value}% 超过 Codex 上限 90%，Codex 会忽略它。应用时将按 {applied}% 写入。',
     },
     en: {
         low: 'On a 200K window only about {remain} tokens would be free when compacting (at least {min} recommended). A long tool output could overflow the window and make compaction fail.',
         limited: 'Higher than the usable window ({effective}%), so {applied}% is what takes effect. To compact later, raise the usable window first.',
-        over: '{value}% is above Codex\'s 90% ceiling, which Codex ignores. {applied}% will be written when you apply.',
     },
     ru: {
         low: 'На окне 200K при сжатии останется около {remain} токенов (рекомендуется не менее {min}). Длинный вывод инструмента может переполнить окно, и сжатие не удастся.',
         limited: 'Выше доступного окна ({effective}%), поэтому действует {applied}%. Чтобы сжимать позже, сначала увеличьте доступное окно.',
-        over: '{value}% выше предела Codex в 90%, и Codex это значение игнорирует. При применении будет записано {applied}%.',
     },
 };
 
@@ -269,8 +266,8 @@ const parseCompactPercent = (raw: string | undefined, fallback: number): number 
 /** The warning for the shared auto-compact percent, or null when it is fine. */
 export function compactDefaultWarning(
     prefs: CodexPrefs,
-    text: { low: string; limited: string; over: string },
-): { severity: 'warning' | 'info' | 'error'; message: string } | null {
+    text: { low: string; limited: string },
+): { severity: 'warning' | 'info'; message: string } | null {
     const effective = parseCompactPercent(prefs.effective_context_window_percent, CONTEXT_PERCENT_DEFAULTS.effective_context_window_percent);
     const percent = parseCompactPercent(prefs.auto_compact_percent, CONTEXT_PERCENT_DEFAULTS.auto_compact_percent);
     const plan = planCodexCompact({ window: CODEX_COMPACT.window, percent, effectivePercent: effective });
@@ -281,7 +278,6 @@ export function compactDefaultWarning(
         .replace('{remain}', plan.remain.toLocaleString('en-US'))
         .replace('{min}', CODEX_COMPACT.minRemaining.toLocaleString('en-US'));
     switch (plan.status) {
-        case 'over': return { severity: 'error', message: fill(text.over) };
         case 'limited': return { severity: 'info', message: fill(text.limited) };
         case 'low': return { severity: 'warning', message: fill(text.low) };
         default: return null;
