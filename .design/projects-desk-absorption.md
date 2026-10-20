@@ -2,6 +2,10 @@
 
 Diagrams: [projects-desk-absorption.pencil.md](./projects-desk-absorption.pencil.md).
 
+> Superseded in part by [projects-sessions.md](./projects-sessions.md): the
+> Workdir table and `/projects/sessions|workdirs` routes are gone; a working
+> folder is now a `type=folder` project and its sessions are threads.
+>
 > Status: 已实施 (phases 1–4). Desk is gone; working in a plain folder is a
 > Projects working-folder session. Phase 5 is still open. This note supersedes
 > the "out of scope: merging the two products" line of TEP #2063.

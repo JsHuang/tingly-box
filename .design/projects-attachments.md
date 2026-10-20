@@ -51,6 +51,11 @@ view of other sessions' files. Routes: `POST /projects/workdirs/attachments`
 for the first message, `POST /projects/sessions/:sid/attachments` and
 `GET .../attachments/file` after.
 
+> Since the unified Thread model a working folder is a `type=folder` project,
+> and these routes are `POST /projects/:id/attachments` (on a folder project:
+> the draft area for its next thread), `POST /threads/:id/attachments` and
+> `GET /threads/:id/attachments/file`. The storage location is unchanged.
+
 ## What the model gets
 
 The message text is followed by a note listing each file's absolute path, type

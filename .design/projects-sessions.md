@@ -103,7 +103,7 @@ ChannelBinding(platform, chat_id) ──▶ thread_id
 | `ThreadEvent.From` | `source` 一组字段 | 来源是事件的属性 |
 | `workdirs` 表、`Workdir` | `projects.type=folder` + `path` | 不再有第二套身份 |
 | `project_id == ""` 的 12 处判断 | `project.type` 或 `thread.parent_id` | 判断依据是显式字段 |
-| `/projects/sessions`、`/projects/workdirs` | `GET /projects?type=folder`、`/projects/:id/threads` | 一套接口 |
+| `/projects/sessions`、`/projects/workdirs` | `GET /projects`（两种类型都在里面）、`/threads/:id/...` | 一套接口，按 id 寻址，不按类型过滤 |
 | 新线程的 `<project>/worktrees/<id>/` | `<project>/threads/<id>/`；旧线程的 `cwd` 不动 | 磁盘上的目录不搬，`cwd` 记全路径 |
 
 `kind` 不用了，字段叫 `type`；`folder` 代替 `workdir`，避免和 worktree 混淆。
@@ -131,7 +131,21 @@ ChannelBinding(platform, chat_id) ──▶ thread_id
   Coordinator 的消息读写换成主线程的事件；`Relay`、`ChatBridge` 按线程路由；M1 的绑定接口改收 `thread_id`（仍可传 `project_id`，由服务解析为主线程）。
 - **前端**：`@tingly/projects` 里文件夹会话和工作目录相关的类型、页面、hooks 并入项目和线程；项目页和文件夹页共用布局，按 `type` 隐藏项目才有的区块；
   侧栏两组按 `type` 过滤同一个列表，等待信号合成一份。
-- **API**：必要的破坏，不做兼容别名，发布说明里写明。保留 `/projects/:id/threads` 这条主路径，所以线程相关的前端改动少。
+- **API**：必要的破坏，不做兼容别名，发布说明里写明。形状固定，不随类型变：
+  - `GET /projects` 返回全部项目（带 `type`、`path`、`main_thread_id`），不按类型过滤；`POST /projects` 带 `type`（`project` 默认，或 `folder` + `path`；文件夹已存在则返回原项目）；`DELETE /projects/:id` 对两种类型都是归档，没有硬删除。
+  - 线程按 id 寻址，都在扁平的 `/threads/:id/...` 下：`GET /threads/:id`、`GET /threads/:id/events`、`POST /threads/:id/messages`（唯一的 `Send`）、`respond|stop|archive|reopen|handoff|merge`、`PUT auto-answer|permission-mode|profile|model`、`tasks/...`、`attachments`。
+  - 项目对话就是 `/threads/:main_thread_id/messages` 和 `/events`；`/projects/:id/messages*` 删除。
+  - `GET /projects/:id/threads` 列出项目的线程（不含主线程）；`POST` 只对文件夹开放（项目的线程由主线程开）。
+  - `GET /projects/events` 是所有项目的 SSE（侧栏用），`/projects/:id/events` 保留；事件 `message` 取消，主线程事件以 `thread_event` 到达。
+  - 绑定：`PUT /projects/channel-bindings` 收 `thread_id` 或 `project_id`（二选一，项目解析为主线程；文件夹项目不能直接绑，400），响应带 `thread_id` 与 `project_id`；列表可按 `project_id`、`thread_id` 过滤。
+  - `Send(thread, text, source)`：`agent=llm` 的线程交给协调者，其他交给线程队列；`source` 记 web（空）/im/thread/system 及 ref、platform、chat_id。
+
+### 实现时的取舍
+
+- `seq` 取项目内 max+1，主线程为 0；线程不会被删除，所以不会复用。
+- 文件夹线程共用一个全局运行位（和原来的会话一致）。
+- 旧表 `project_messages`、`workdirs` 保留只读一个版本；迁移里丢弃项目已不存在的悬空绑定。
+- 路径大小写折叠只在 windows/darwin 上做。
 
 ## 交付
 

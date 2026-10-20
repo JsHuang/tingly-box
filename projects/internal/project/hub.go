@@ -5,12 +5,15 @@ import (
 	"sync"
 )
 
+// AllProjects subscribes to every project's events (the sidebar's stream); it
+// carries everything but streamed coordinator text.
+const AllProjects = "*"
+
 // Event types pushed to a project's SSE stream.
 const (
-	EventMessage      = "message"       // a project message was created or rewritten
 	EventMessageDelta = "message_delta" // streamed coordinator text
 	EventThread       = "thread"        // a thread changed
-	EventThreadEvent  = "thread_event"  // a thread transcript entry was added or changed
+	EventThreadEvent  = "thread_event"  // a thread transcript entry was added or changed (the project conversation is its main thread's)
 	EventProject      = "project"       // project settings or state changed
 	EventCoordinator  = "coordinator"   // the coordinator started or finished working ({"busy": bool})
 )
@@ -59,10 +62,16 @@ func (h *Hub) Publish(ev Event) {
 	}
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	for ch := range h.subs[ev.ProjectID] {
-		select {
-		case ch <- b:
-		default:
+	send := func(subs map[chan []byte]struct{}) {
+		for ch := range subs {
+			select {
+			case ch <- b:
+			default:
+			}
 		}
+	}
+	send(h.subs[ev.ProjectID])
+	if ev.Type != EventMessageDelta {
+		send(h.subs[AllProjects])
 	}
 }
