@@ -62,6 +62,11 @@ type CodexPrefs struct {
 	SupportsReasoningSummaries    string `json:"supports_reasoning_summaries,omitempty"`
 	EffectiveContextWindowPercent string `json:"effective_context_window_percent,omitempty"`
 	AutoCompactPercent            string `json:"auto_compact_percent,omitempty"`
+
+	// ModelAutoCompactPercent carries per-model overrides of AutoCompactPercent
+	// (catalog slug -> percent), filled by the server from the rules'
+	// codex_compact_percent flag. Never read from a request.
+	ModelAutoCompactPercent map[string]int `json:"-"`
 }
 
 // codexLegacySupportsSummariesKey is the config.toml key older versions wrote;
@@ -73,6 +78,10 @@ const codexLegacySupportsSummariesKey = "model_supports_reasoning_summaries"
 const (
 	codexMinContextPercent = 50
 	codexMaxContextPercent = 100
+
+	// Codex ignores an auto-compact limit above 90% of the context window, so
+	// nothing higher is ever written to the catalog.
+	codexMaxAutoCompactPercent = 90
 )
 
 // contextHeadroom resolves the effective-window and auto-compact percentages,
@@ -85,7 +94,20 @@ func (p *CodexPrefs) contextHeadroom() (effective, compact int) {
 		effective = codexParsePercent(p.EffectiveContextWindowPercent, effective)
 		compact = codexParsePercent(p.AutoCompactPercent, compact)
 	}
-	return effective, min(compact, effective)
+	return effective, min(compact, effective, codexMaxAutoCompactPercent)
+}
+
+// modelCompactPercent resolves one model's auto-compact percentage: the
+// rule-level override when it is in range, else the shared default. The result
+// never exceeds the usable window (effective) nor Codex's own ceiling.
+func (p *CodexPrefs) modelCompactPercent(model string, effective, fallback int) int {
+	pct := fallback
+	if p != nil {
+		if v, ok := p.ModelAutoCompactPercent[model]; ok && v >= codexMinContextPercent && v <= codexMaxContextPercent {
+			pct = v
+		}
+	}
+	return min(pct, effective, codexMaxAutoCompactPercent)
 }
 
 func codexParsePercent(raw string, fallback int) int {
@@ -542,7 +564,7 @@ func RenderCodexModelCatalogWithPrefs(models []string, contextWindows map[string
 			"supports_parallel_tool_calls":     true,
 			"context_window":                   contextWindow,
 			"max_context_window":               maxContextWindow,
-			"auto_compact_token_limit":         contextWindow * compactPct / 100,
+			"auto_compact_token_limit":         contextWindow * prefs.modelCompactPercent(model, effectivePct, compactPct) / 100,
 			"effective_context_window_percent": effectivePct,
 			"experimental_supported_tools":     []string{},
 			"input_modalities":                 []string{"text", "image"},
@@ -586,11 +608,22 @@ func restoreCodexCatalogHeadroom(prefs *CodexPrefs, cfg map[string]interface{}) 
 	if m.EffectivePercent != codexEffectiveContextWindowPercent && m.EffectivePercent >= codexMinContextPercent && m.EffectivePercent <= codexMaxContextPercent {
 		prefs.EffectiveContextWindowPercent = strconv.Itoa(m.EffectivePercent)
 	}
-	if m.ContextWindow > 0 {
-		compact := m.AutoCompactLimit * 100 / m.ContextWindow
-		if compact != codexDefaultAutoCompactTokenLimitPct && compact >= codexMinContextPercent && compact <= codexMaxContextPercent {
-			prefs.AutoCompactPercent = strconv.Itoa(compact)
+	// Individual models can carry their own compact percent (rule override), so
+	// the shared default is the most common value, first entry winning ties.
+	counts := map[int]int{}
+	compact, best := 0, 0
+	for _, e := range catalog.Models {
+		if e.ContextWindow <= 0 {
+			continue
 		}
+		pct := e.AutoCompactLimit * 100 / e.ContextWindow
+		counts[pct]++
+		if counts[pct] > best {
+			compact, best = pct, counts[pct]
+		}
+	}
+	if compact != codexDefaultAutoCompactTokenLimitPct && compact >= codexMinContextPercent && compact <= codexMaxContextPercent {
+		prefs.AutoCompactPercent = strconv.Itoa(compact)
 	}
 }
 
@@ -613,6 +646,22 @@ func BuildContextWindowsFromRules(cfg *Config) map[string]int {
 		}
 	}
 	return contextWindows
+}
+
+// BuildCompactPercentsFromRules maps each active Codex rule that sets its own
+// codex_compact_percent to that value, keyed like BuildContextWindowsFromRules.
+// Rules without the flag are absent: they follow the shared default.
+func BuildCompactPercentsFromRules(cfg *Config) map[string]int {
+	percents := make(map[string]int)
+	for _, rule := range cfg.GetRequestConfigs() {
+		if rule.GetScenario() != typ.ScenarioCodex || !rule.Active || rule.Flags.CodexCompactPercent == 0 {
+			continue
+		}
+		if model := strings.TrimSpace(rule.RequestModel); model != "" {
+			percents[model] = rule.Flags.CodexCompactPercent
+		}
+	}
+	return percents
 }
 
 var codexProfileKeyInvalid = regexp.MustCompile(`[^A-Za-z0-9_-]`)

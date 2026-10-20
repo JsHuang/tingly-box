@@ -138,7 +138,7 @@ const FIELDS_TEXT_ZH: FieldTextMap = {
     auto_compact_percent: {
         label: '自动压缩阈值 (%)',
         purpose: '上下文用到窗口的这个比例时触发自动压缩',
-        tooltip: '写入模型目录的 auto_compact_token_limit（窗口 × 比例），范围 50–100，且不会高于可用窗口比例。留空用 tb 默认（75）。',
+        tooltip: '写入模型目录的 auto_compact_token_limit（窗口 × 比例），范围 50–100，且不会高于可用窗口比例，也不会超过 Codex 自身的 90% 上限。留空用 tb 默认（75）。这是所有模型的默认值，单个模型可在规则行的“压缩”芯片里覆盖。',
     },
 };
 
@@ -171,7 +171,7 @@ const FIELDS_TEXT_EN: FieldTextMap = {
     auto_compact_percent: {
         label: 'Auto-compact at (%)',
         purpose: 'Compact the conversation once context reaches this share of the window',
-        tooltip: 'Written to the catalog as auto_compact_token_limit (window × percent), range 50–100, never above the usable window. Empty = tb default (75).',
+        tooltip: 'Written to the catalog as auto_compact_token_limit (window × percent), range 50–100, never above the usable window or Codex\'s own 90% ceiling. Empty = tb default (75). This is the default for every model; a single model can override it with the Compact chip on its rule row.',
     },
 };
 
@@ -204,7 +204,7 @@ const FIELDS_TEXT_RU: FieldTextMap = {
     auto_compact_percent: {
         label: 'Автосжатие при (%)',
         purpose: 'Сжимать диалог, когда контекст достигает этой доли окна',
-        tooltip: 'Записывается в каталог как auto_compact_token_limit (окно × доля), диапазон 50–100, не выше доступного окна. Пусто — значение tb по умолчанию (75).',
+        tooltip: 'Записывается в каталог как auto_compact_token_limit (окно × доля), диапазон 50–100, не выше доступного окна и не выше собственного предела Codex в 90%. Пусто — значение tb по умолчанию (75). Это значение по умолчанию для всех моделей; для отдельной модели его можно переопределить чипом «Сжатие» в строке правила.',
     },
 };
 
