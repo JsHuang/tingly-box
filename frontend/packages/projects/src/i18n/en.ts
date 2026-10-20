@@ -15,7 +15,7 @@ export const en = {
         bots_one: '{{count}} bot', bots_other: '{{count}} bots',
         chatKind: { direct: 'Private chat', group: 'Group' },
         tags: { label: 'Bound IM chats', bind: 'Bind chat', unbind: 'Unbind {{chat}}', more: '+{{count}}', manage: 'IM chats' },
-        place: { none: 'Not bound right now', at: 'Bound to {{place}}', elsewhere: 'another project' },
+        place: { none: 'Not bound right now', at: 'Bound to {{place}}', atFolder: 'Bound to folder {{place}}', elsewhere: 'another project' },
         bind: {
             title: 'Bind a chat to {{project}}', rebind: 'Will move', blocked: 'Disabled in access control',
             note: 'A chat is bound to one place at a time. Moving it keeps the old threads; nothing is deleted.',
@@ -42,12 +42,15 @@ export const en = {
     },
     workdir: {
         title: 'Working folders', add: 'Add working folder', remove: 'Remove from the sidebar',
+        removeTitle: 'Remove this folder?', removeConfirm: 'Remove',
+        removeRunning_one: 'This stops {{count}} running session in {{name}} and takes the folder off the sidebar. Its past sessions are kept.',
+        removeRunning_other: 'This stops {{count}} running sessions in {{name}} and takes the folder off the sidebar. Its past sessions are kept.',
         addHelp: 'Enter an existing folder on the machine running this app. Sessions you start there work in the folder itself, with no worktree.',
         pathExample: '/path/to/folder',
     },
     session: {
         sessions: 'Sessions', new: 'New session', none: 'No sessions yet', folder: 'Working folder', chooseFolder: 'Choose a working folder',
-        folderPlaceholder: '/path/to/folder', heading: 'What should Claude work on?', promptPlaceholder: 'Describe a task…',
+        folderPlaceholder: '/path/to/folder', attachNeedsFolder: 'Choose a working folder to attach files', heading: 'What should Claude work on?', promptPlaceholder: 'Describe a task…',
         placeholder: 'Message this session…', queuePlaceholder: 'Message this session — it reads it after its current turn…',
         archivedPlaceholder: 'Reopen the session to send it more work', archive: 'Archive session', reopen: 'Reopen session',
         refreshFailed: 'Could not refresh the sessions. What is shown is the last loaded; reconnecting automatically.',

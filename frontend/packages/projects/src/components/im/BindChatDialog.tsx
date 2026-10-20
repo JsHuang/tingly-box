@@ -4,7 +4,8 @@ import { DialogHeader, EmptyState } from '@tingly/ui';
 import { fontSizes } from '@tingly/ui/theme/fonts';
 import { useTranslation } from 'react-i18next';
 import type { ChannelBinding } from '../../client/channelBindings';
-import type { ProjectSummary } from '../../client';
+import { isFolder, type ProjectSummary } from '../../client';
+import { folderName } from '../../utils/format';
 import type { ImChat } from '../../host/ProjectsHost';
 import { Info } from '../icons';
 import { ChoiceList, type Choice } from './ChoiceList';
@@ -50,7 +51,9 @@ export function BindChatDialog({ open, threadId, targetName, chats, hasBots, byC
 
     const items: Choice[] = candidates.map((c) => {
         const bound = byChat.get(chatKey(c.platform, c.chatId));
-        const where = bound ? t('im.place.at', { place: directory.get(bound.project_id)?.name ?? t('im.place.elsewhere') }) : t('im.place.none');
+        const place = bound ? directory.get(bound.project_id) : undefined;
+        // A folder is bound by one of its threads: say it is a folder, not a project.
+        const where = bound ? t(place && isFolder(place) ? 'im.place.atFolder' : 'im.place.at', { place: (place && isFolder(place) ? folderName(place.path ?? '') || place.name : place?.name) ?? t('im.place.elsewhere') }) : t('im.place.none');
         return {
             key: chatKey(c.platform, c.chatId),
             lead: <PlatformMark platform={c.platform} size={28} />,

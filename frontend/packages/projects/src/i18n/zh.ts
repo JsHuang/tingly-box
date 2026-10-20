@@ -19,7 +19,7 @@ export const zh: Dict<typeof en> = {
         bots_one: '{{count}} 个机器人', bots_other: '{{count}} 个机器人',
         chatKind: { direct: '私聊', group: '群聊' },
         tags: { label: '已绑定的 IM', bind: '绑定聊天', unbind: '解绑 {{chat}}', more: '+{{count}}', manage: 'IM 聊天' },
-        place: { none: '现在没有绑定', at: '现在绑定在 {{place}}', elsewhere: '另一个项目' },
+        place: { none: '现在没有绑定', at: '现在绑定在 {{place}}', atFolder: '现在绑定在目录 {{place}}', elsewhere: '另一个项目' },
         bind: {
             title: '把聊天绑定到 {{project}}', rebind: '将改绑', blocked: '已在访问控制中停用',
             note: '一个聊天同一时间只绑定一个地方；改绑后旧线程会保留，不会删除。',
@@ -46,10 +46,14 @@ export const zh: Dict<typeof en> = {
     },
     workdir: {
         title: '工作目录', add: '添加工作目录', remove: '从侧栏移除',
+        removeTitle: '移除此目录？', removeConfirm: '移除',
+        removeRunning_one: '这会停止 {{name}} 中 {{count}} 个正在运行的会话，并把该目录从侧栏移除。历史会话会保留。',
+        removeRunning_other: '这会停止 {{name}} 中 {{count}} 个正在运行的会话，并把该目录从侧栏移除。历史会话会保留。',
         addHelp: '填写运行本应用的这台机器上已有的目录。在这里开的会话直接在该目录里工作，不建 worktree。',
         pathExample: '/目录路径',
     },
     session: {
+        attachNeedsFolder: '先选择工作目录，再添加附件',
         sessions: '会话', new: '新建会话', none: '还没有会话', folder: '工作目录', chooseFolder: '选择工作目录',
         folderPlaceholder: '/目录路径', heading: '需要 Claude 处理什么任务？', promptPlaceholder: '描述一个任务…',
         placeholder: '给这个会话发消息…', queuePlaceholder: '给这个会话发消息——它会在当前一轮结束后读到…',

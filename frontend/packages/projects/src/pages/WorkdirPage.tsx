@@ -13,6 +13,7 @@ import { ThreadPanel } from '../components/project/ThreadPanel';
 import { StatusGroups, type StatusGroup } from '../components/workspace/StatusGroups';
 import { WorkspaceLayout, useWorkspacePane } from '../components/workspace/WorkspaceLayout';
 import { Add, Close } from '../components/icons';
+import { ConfirmDialog } from '../components/ConfirmDialog';
 import { useNotify } from '../hooks/useNotify';
 import type { ProjectEvent } from '../hooks/useProjectEvents';
 import { useProjectList } from '../hooks/useProjectList';
@@ -151,8 +152,8 @@ export default function WorkdirPage() {
                 const th = ev.data as Thread;
                 // Only the folders this page lists (the stream carries every project's).
                 const mine = scope ? th.project_id === folder?.id : !!folders?.some((f) => f.id === th.project_id);
+                // The list stream already refreshes the folder list for this event.
                 if (mine) setSessions((list) => upsert(list ?? [], th));
-                refresh();
             } else if (ev.type === 'thread_event') {
                 const e = ev.data as ThreadEvent;
                 if (e.thread_id !== sessionId) return;
@@ -191,6 +192,18 @@ export default function WorkdirPage() {
 
     // The folder's project, opened first if it is new (the server returns the existing one otherwise).
     const openFolder = (path: string): Promise<Project> => unwrap(api.POST('/api/v1/projects', { body: { type: 'folder', path } }));
+
+    // Uploads need a folder project to hang the files on (the server keeps a
+    // draft area per folder), so attaching opens the folder first. Side effect,
+    // accepted: a draft that is never sent still leaves the folder opened (or
+    // un-archived) in the list, which is why the list is reloaded here and
+    // Attach stays disabled until a folder is chosen. A draft owner that is
+    // independent of the folder would need a backend change.
+    const attach = async (path: string, files: File[]): Promise<Attachment[]> => {
+        const f = await openFolder(path);
+        reloadList();
+        return uploadAttachments({ draftFolderId: f.id }, files);
+    };
 
     const create = async (path: string, content: string, permission_mode: string, launch: SessionLaunch, attachments: Attachment[]): Promise<boolean> => {
         try {
@@ -245,6 +258,10 @@ export default function WorkdirPage() {
         }
     };
 
+    // Threads a removal would stop: the ones working or waiting on a request.
+    const stopCount = folder ? folder.threads.working + folder.threads.waiting : 0;
+    const [confirmRemove, setConfirmRemove] = useState(false);
+
     const removeFolder = async () => {
         try {
             if (!folder) return;
@@ -286,7 +303,7 @@ export default function WorkdirPage() {
                         {im && <Box sx={{ display: { xs: 'none', md: 'flex' }, minWidth: 0, flexShrink: 1 }}><ProjectImTags im={im} /></Box>}
                         {removable && (
                             <Tooltip title={t('workdir.remove')}>
-                                <IconButton size="small" aria-label={t('workdir.remove')} onClick={() => void removeFolder()}><Close fontSize="small" /></IconButton>
+                                <IconButton size="small" aria-label={t('workdir.remove')} onClick={() => (stopCount > 0 ? setConfirmRemove(true) : void removeFolder())}><Close fontSize="small" /></IconButton>
                             </Tooltip>
                         )}
                         <Button size="small" startIcon={<Add />} onClick={() => openNew()}>{t('session.new')}</Button>
@@ -349,11 +366,20 @@ export default function WorkdirPage() {
                         permissionModes={modes}
                         onCreate={create}
                         onAddFolder={() => setAdding(true)}
-                        onAttach={async (path, files) => uploadAttachments({ draftFolderId: (await openFolder(path)).id }, files)}
+                        onAttach={attach}
                     />
                 )}
             />
             {im?.dialog}
+            <ConfirmDialog
+                open={confirmRemove}
+                title={t('workdir.removeTitle')}
+                message={t('workdir.removeRunning', { count: stopCount, name: folder ? folderName(folder.path ?? '') : '' })}
+                confirmLabel={t('workdir.removeConfirm')}
+                danger
+                onClose={() => setConfirmRemove(false)}
+                onConfirm={() => void removeFolder()}
+            />
             {adding && (
                 <AddWorkdirDialog
                     onClose={() => setAdding(false)}

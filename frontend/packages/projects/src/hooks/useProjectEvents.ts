@@ -52,6 +52,40 @@ export function useAllProjectEvents(onEvent: (ev: ProjectEvent) => void, onOpen?
     useEventStream(enabled ? '/api/v1/projects/events' : '', onEvent, onOpen);
 }
 
+/**
+ * Opens a live event stream outside React, reconnecting when it drops, and
+ * returns the function that closes it. onOpen runs on every reconnect.
+ */
+export function openEventStream(url: string, onEvent: (ev: ProjectEvent) => void, onOpen?: () => void): () => void {
+    const abort = new AbortController();
+    const { signal } = abort;
+    void (async () => {
+        let first = true;
+        while (!signal.aborted) {
+            try {
+                const res = await apiFetch(url, {
+                    headers: { Accept: 'text/event-stream' },
+                    signal,
+                });
+                if (res.ok && !first) onOpen?.();
+                first = false;
+                await readEventStream(res, (data) => {
+                    try {
+                        onEvent(JSON.parse(data) as ProjectEvent);
+                    } catch {
+                        // ignore malformed frames
+                    }
+                });
+            } catch {
+                // offline or refused: retry below
+            }
+            if (signal.aborted) return;
+            await new Promise((r) => setTimeout(r, RETRY_MS));
+        }
+    })();
+    return () => abort.abort();
+}
+
 function useEventStream(url: string, onEvent: (ev: ProjectEvent) => void, onOpen?: () => void) {
     const handler = useRef(onEvent);
     const opened = useRef(onOpen);
@@ -60,32 +94,6 @@ function useEventStream(url: string, onEvent: (ev: ProjectEvent) => void, onOpen
 
     useEffect(() => {
         if (!url) return;
-        const abort = new AbortController();
-        const { signal } = abort;
-        void (async () => {
-            let first = true;
-            while (!signal.aborted) {
-                try {
-                    const res = await apiFetch(url, {
-                        headers: { Accept: 'text/event-stream' },
-                        signal,
-                    });
-                    if (res.ok && !first) opened.current?.();
-                    first = false;
-                    await readEventStream(res, (data) => {
-                        try {
-                            handler.current(JSON.parse(data) as ProjectEvent);
-                        } catch {
-                            // ignore malformed frames
-                        }
-                    });
-                } catch {
-                    // offline or refused: retry below
-                }
-                if (signal.aborted) return;
-                await new Promise((r) => setTimeout(r, RETRY_MS));
-            }
-        })();
-        return () => abort.abort();
+        return openEventStream(url, (ev) => handler.current(ev), () => opened.current?.());
     }, [url]);
 }

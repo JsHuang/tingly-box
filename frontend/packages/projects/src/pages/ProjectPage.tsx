@@ -73,7 +73,11 @@ export default function ProjectPage() {
 
     const loadMessages = useCallback(async (main: string) => {
         const m = await unwrap(api.GET('/api/v1/threads/{id}/events', { params: { path: { id: main }, query: { limit: 200 } } }));
-        setMessages(m.events);
+        // Merge, not replace: a thread_event that arrived after the snapshot was taken stays.
+        setMessages((list) => {
+            const ids = new Set(m.events.map((e) => e.id));
+            return [...m.events, ...(list ?? []).filter((e) => !ids.has(e.id))];
+        });
     }, []);
 
     const load = useCallback(async () => {
@@ -106,6 +110,9 @@ export default function ProjectPage() {
     useEffect(() => {
         setProject(null);
         setMessages(null);
+        setThreads([]);
+        setThreadEvents(null);
+        setBusy(false);
         void load();
     }, [load]);
 
@@ -127,7 +134,7 @@ export default function ProjectPage() {
                 if (th.id === mainThreadId) break;
                 setThreads((list) => upsert(list, th));
                 if (th.status !== 'working' && th.status !== 'waiting') setLibraryKey((k) => k + 1);
-                refresh();
+                // No refresh(): the shared list's own stream covers thread events.
                 break;
             }
             case 'thread_event': {
@@ -146,7 +153,7 @@ export default function ProjectPage() {
                 break;
             }
         }
-    }, [threadId, mainThreadId, refresh]);
+    }, [threadId, mainThreadId]);
 
     useProjectEvents(id, onEvent, () => {
         void load();

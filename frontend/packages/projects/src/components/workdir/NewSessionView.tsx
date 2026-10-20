@@ -48,6 +48,8 @@ export function NewSessionView({ initialFolder, folders, permissionModes, onCrea
                     onTextChange={setText}
                     onAccepted={(sent) => setText((prev) => (prev === sent ? '' : prev))}
                     attach={(files) => onAttach(folder.trim(), files)}
+                    // Files are stored under the folder's project, so there must be a folder first.
+                    attachBlocked={folder.trim() === '' ? t('session.attachNeedsFolder') : undefined}
                     onSend={(prompt, attachments) => onCreate(folder.trim(), prompt, mode, launch, attachments)}
                     leftSlot={(
                         <>
