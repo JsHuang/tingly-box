@@ -82,6 +82,73 @@ Projects 事件 ──▶ 订阅了该落点的 binding ──▶ 渲染到 chat
 - 回复前缀：已绑定时每条回复带落点短名（例：`[tingly-box] …`），避免用户忘了自己在哪。
 - 一个 chat 同一时刻只绑一个落点；一个落点可以被多个 chat 绑定（手机和群各一个），出站按 binding 广播。
 
+## 统一到 Project ID（M2a，待讨论）
+
+图见 [projects-im.pencil.md](./projects-im.pencil.md) 的 “One entity, two kinds”。
+
+### 现在的样子
+
+- 项目：`projects` 表，一个项目下有线程（`threads.project_id` 指向它）和一个 coordinator 对话（`project_messages`）。
+- 工作目录：没有自己的行。`workdirs` 表只存“保存了哪些文件夹”（主键是路径，没有 id）；文件夹里的会话是
+  `project_id` 为空、`worktree` 等于文件夹路径的线程。
+- 所以“落点”有两种身份：项目 id、文件夹路径。代码里有 12 处 `ProjectID == ""` 在区分两者，接口也是两套
+  （`/projects/:id/...` 和 `/projects/sessions`、`/projects/workdirs`），前端的页面、侧栏、等待信号也各算各的。
+
+### 目标
+
+只有一种实体 `Project`，用 `kind` 区分：
+
+| | `kind=project` | `kind=workdir` |
+|---|---|---|
+| 谁接话 | coordinator（项目对话） | 无；消息直接发给当前会话 |
+| 线程 | coordinator 或用户开，每个线程一个 worktree 分支 | 用户开，工作在文件夹里，无分支 |
+| 目标、指令、记忆、文件库、仓库 | 有 | 无（界面不显示） |
+| review、合并、汇报 | 有 | 无 |
+| `path` | 空 | 文件夹路径，唯一 |
+| 侧栏分组 | 项目 | 工作目录 |
+| IM 绑定 | 有，进项目对话 | 有，进当前会话 |
+
+线程总是有 `project_id`。原来要判断“有没有项目”的地方，改为判断所属项目的 `kind`。
+
+### 迁移
+
+升级时一次性做，幂等：
+1. `projects` 加 `kind`（默认 `project`）和 `path`。
+2. 对 `workdirs` 表的每个路径，以及 `project_id` 为空的线程用到的每个 `worktree` 路径，各建一个
+   `kind=workdir` 的项目（名字取文件夹名，`created_at`/`updated_at` 取原来的创建和最近使用时间）。
+3. 把这些线程的 `project_id` 回填成新项目的 id。
+4. 之后 `project_id` 不再允许为空（SQLite 改列约束麻烦，用写入时校验加启动时检查，不重建表）。
+5. `workdirs` 表保留一个版本不再读写，下个版本删除，给回滚留余地。
+
+不丢数据：线程、事件、`session_id` 和附件都不动，只是多了所属项目。
+
+### 接口（建议先不动外部路径）
+
+- `GET /projects` 默认只返回 `kind=project`，`?kind=workdir` 返回工作目录；响应里的 `Project` 多 `kind`、`path`。
+- 现有 `/projects/sessions`、`/projects/workdirs` 保留，内部改成查 `kind=workdir` 的项目，前端不用同时改。
+  等前端按入口统一后再收敛成 `/projects/:id/threads`（M2a 之外）。
+- 页面路径：工作目录用 `/projects/:id`（页面按 `kind` 选布局），旧的 `/projects/folder?path=` 重定向过去。
+
+### 影响面
+
+- 后端：threads、transcript、attachment、channels 里 12 处 `ProjectID == ""` 改成 kind 判断；
+  `DeleteProject` 对工作目录要等同于“移除文件夹”，会话保留的语义（现在“移除只是不在侧栏显示”）改成 `archived_at`。
+- 前端：侧栏两组改成按 `kind` 过滤同一个列表，等待信号合并成一份计数；项目页和工作目录页共用 `WorkspaceLayout`，
+  只是不显示项目才有的区块。
+- IM：绑定只有 `project_id`，路由按 kind 分支，`/new`、`/stop` 作用于工作目录的当前会话。
+
+### 风险
+
+- 迁移写错会让会话“消失”：要有一个迁移前后线程总数、每个线程都有归属的校验，并在测试里用一份带文件夹会话的旧库快照跑一遍。
+- 同一路径大小写、末尾斜杠、软链接不一致会产生重复的工作目录项目：入库前统一规范化路径，唯一索引兜底。
+- 外部调用方（独立版 Projects 的使用者）看到的 `Project` 多了字段，列表默认值不变，应当兼容。
+
+### 需要拍板
+
+1. 外部路径是否先不动（建议），还是同一个 PR 里也统一？
+2. 工作目录是否出现在“项目”列表页里（建议不出现，列表默认 `kind=project`）？
+3. “移除文件夹”要不要真的删会话？（建议只归档项目，会话保留，和现在一致。）
+
 ## 在 IM 里点名线程
 
 project 绑定的 chat 默认在跟 coordinator 说话；要对某个线程说话，需要能“点名”。点名是一次 `@`：
