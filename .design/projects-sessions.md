@@ -103,10 +103,22 @@ ChannelBinding(platform, chat_id) ──▶ thread_id
 | `ThreadEvent.From` | `source` 一组字段 | 来源是事件的属性 |
 | `workdirs` 表、`Workdir` | `projects.type=folder` + `path` | 不再有第二套身份 |
 | `project_id == ""` 的 12 处判断 | `project.type` 或 `thread.parent_id` | 判断依据是显式字段 |
-| `/projects/sessions`、`/projects/workdirs` | `GET /projects?type=folder`、`/projects/:id/threads` | 一套接口 |
+| `/projects/sessions/:sid/*`、`/projects/:id/threads/:tid/*`、`/projects/workdirs`、`/projects/:id/messages*` | 见下“接口”：按 ID 平铺 | 一套接口 |
 | 新线程的 `<project>/worktrees/<id>/` | `<project>/threads/<id>/`；旧线程的 `cwd` 不动 | 磁盘上的目录不搬，`cwd` 记全路径 |
 
 `kind` 不用了，字段叫 `type`；`folder` 代替 `workdir`，避免和 worktree 混淆。
+
+## 接口：按 ID 寻址，不按类别分路
+
+入口都能用 ID 标识，ID 查回来就知道它是什么（`type`、是不是主线程），所以 URL 的形状对所有类别一致，API 里没有 `type` 过滤：
+
+- `GET /projects` 返回全部项目（两种 `type`），每项带 `type`、`path`、`main_thread_id`；由客户端分组。
+  `POST /projects` 创建任一类（body 带 `type`，文件夹带 `path`）。`GET/PATCH/DELETE /projects/:id` 对两类相同，`DELETE` 一律是归档。
+- 线程按线程 id 平铺，一套路径：`/threads/:id`、`/threads/:id/events`、`POST /threads/:id/messages`（即 `Send`）、
+  `/respond`、`/stop`、`/archive`、`/reopen`、`/permission-mode`、`/auto-answer`、`/profile`、`/model`、`/handoff`、`/tasks/...`、`/attachments`。
+  所属项目从线程读出。列出和新建仍挂在项目下：`GET/POST /projects/:id/threads`。
+- 项目的对话就是主线程：`/projects/:id/messages*` 去掉，改用 `/threads/:main_thread_id/messages`；项目级的事件流、记忆、文件库、用量不变。
+- 绑定：`PUT /projects/channel-bindings` 收 `thread_id` 或 `project_id`（解析成主线程），响应两者都带。
 
 ## 迁移（升级时一次，幂等）
 
@@ -131,7 +143,7 @@ ChannelBinding(platform, chat_id) ──▶ thread_id
   Coordinator 的消息读写换成主线程的事件；`Relay`、`ChatBridge` 按线程路由；M1 的绑定接口改收 `thread_id`（仍可传 `project_id`，由服务解析为主线程）。
 - **前端**：`@tingly/projects` 里文件夹会话和工作目录相关的类型、页面、hooks 并入项目和线程；项目页和文件夹页共用布局，按 `type` 隐藏项目才有的区块；
   侧栏两组按 `type` 过滤同一个列表，等待信号合成一份。
-- **API**：必要的破坏，不做兼容别名，发布说明里写明。保留 `/projects/:id/threads` 这条主路径，所以线程相关的前端改动少。
+- **API**：必要的破坏，不做兼容别名，发布说明里写明。前端的线程调用全部换成按线程 id 的路径。
 
 ## 交付
 
@@ -158,6 +170,6 @@ ChannelBinding(platform, chat_id) ──▶ thread_id
 
 - 名字沿用 Thread，不引入 role；界面：主线程“项目对话”，其余“线程”。
 - 字段叫 `type`，取值 `project | folder`。
-- API 不做兼容，接受必要的破坏。
+- API 不做兼容，接受必要的破坏；按 ID 寻址，不按 `type` 分路、不做类别过滤。
 - 文件夹“移除”一律只归档，会话保留。
 - 设计、模式、迁移和变更这一版一次完成。
