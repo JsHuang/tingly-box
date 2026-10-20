@@ -329,7 +329,7 @@ export const ModelRequestHeader: React.FC<ModelRequestHeaderProps> = ({
                 {/* Keep 1M visible; Off only means this rule does not add 1M. */}
                 {onContext1MToggle && (
                     <Box sx={{ml: 0.5}} onClick={(e) => e.stopPropagation()}>
-                        <Tooltip title={t('ruleHeader.context1M.tooltip')}>
+                        <Tooltip title="Choose whether this rule adds 1M context">
                             <span>
                                 <Button
                                     size="small"
@@ -337,13 +337,13 @@ export const ModelRequestHeader: React.FC<ModelRequestHeaderProps> = ({
                                     color={context1M ? 'primary' : 'inherit'}
                                     endIcon={<ExpandMoreIcon sx={{fontSize: 14}} />}
                                     disabled={!active}
-                                    aria-label={`${t('ruleHeader.context1M.label')}: ${context1M ? t('ruleHeader.context1M.on') : t('ruleHeader.context1M.off')}`}
+                                    aria-label={`1M context: ${context1M ? 'On' : 'Off'}`}
                                     aria-haspopup="menu"
                                     aria-expanded={Boolean(contextMenuAnchor)}
                                     onClick={(e) => setContextMenuAnchor(e.currentTarget)}
                                     sx={context1M ? highlightedStrategyButtonSx : strategyButtonSx}
                                 >
-                                    1M: {context1M ? t('ruleHeader.context1M.on') : t('ruleHeader.context1M.off')}
+                                    1M: {context1M ? 'On' : 'Off'}
                                 </Button>
                             </span>
                         </Tooltip>
@@ -362,7 +362,7 @@ export const ModelRequestHeader: React.FC<ModelRequestHeaderProps> = ({
                                 }}
                                 sx={{whiteSpace: 'normal', alignItems: 'flex-start', py: 0.75}}
                             >
-                                <ListItemText primary={t('ruleHeader.context1M.off')} secondary={t('ruleHeader.context1M.offHint')} slotProps={{secondary: {sx: {whiteSpace: 'normal', lineHeight: 1.3}}}} />
+                                <ListItemText primary="Off" secondary="Do not add 1M for this rule. Client-requested 1M still works where supported." slotProps={{secondary: {sx: {whiteSpace: 'normal', lineHeight: 1.3}}}} />
                             </MenuItem>
                             <MenuItem
                                 selected={context1M}
@@ -372,7 +372,7 @@ export const ModelRequestHeader: React.FC<ModelRequestHeaderProps> = ({
                                 }}
                                 sx={{whiteSpace: 'normal', alignItems: 'flex-start', py: 0.75}}
                             >
-                                <ListItemText primary={t('ruleHeader.context1M.on')} secondary={t('ruleHeader.context1M.onHint')} slotProps={{secondary: {sx: {whiteSpace: 'normal', lineHeight: 1.3}}}} />
+                                <ListItemText primary="On" secondary="Add 1M for this rule. The upstream model must support it." slotProps={{secondary: {sx: {whiteSpace: 'normal', lineHeight: 1.3}}}} />
                             </MenuItem>
                         </Menu>
                     </Box>
