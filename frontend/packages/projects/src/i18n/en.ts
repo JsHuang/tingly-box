@@ -128,6 +128,15 @@ export const en = {
         uncommittedWarn: 'The thread left uncommitted changes in its worktree; they are not part of the merge:',
     },
     attachments: { removed: '{{name}} (removed)' },
+    strip: {
+        folder: 'Folder', copyCd: 'Click to copy the cd command', branch: 'Branch', copyBranch: 'Click to copy the branch name',
+        autoAnswer: {
+            title: 'Auto-answer', chip: 'Auto-answer: {{value}}', menuTitle: 'When a question has a suggested answer',
+            off: 'Off', offHelp: 'Every question waits for you.',
+            delay: 'After 10 min', delayHelp: 'If you don’t answer within 10 minutes, the thread goes with the suggestion and keeps working.',
+            now: 'Right away', nowHelp: 'The thread goes with the suggestion at once. You can still correct it with a message.',
+        },
+    },
     library: {
         intro: 'Files you add are readable by every thread. Threads without a repository deliver their files here.',
         add: 'Add files', empty: 'No files yet.', download: 'Download', copyPath: 'Copy folder path',
