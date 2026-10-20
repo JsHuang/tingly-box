@@ -108,7 +108,11 @@ export const CodexCompactChip: React.FC<CodexCompactChipProps> = ({
         if (pending.current) clearTimeout(pending.current.timer);
         pending.current = { value, timer: setTimeout(flush, 500) };
     };
-    React.useEffect(() => () => { if (pending.current) clearTimeout(pending.current.timer); }, []);
+    // A value still waiting out its debounce is saved, not dropped, if the card
+    // goes away first.
+    const flushRef = React.useRef(flush);
+    flushRef.current = flush;
+    React.useEffect(() => () => flushRef.current(), []);
 
     const close = () => {
         flush();
