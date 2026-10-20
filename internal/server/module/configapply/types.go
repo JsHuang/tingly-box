@@ -19,8 +19,9 @@ type ApplyClaudeConfigRequest struct {
 	// settings.json. nil falls back to agent.DefaultClaudeCodeShowThinkingSummaries.
 	ShowThinkingSummaries *bool `json:"showThinkingSummaries,omitempty"`
 	// CoAuthoredBy controls both includeCoAuthoredBy and attribution in
-	// settings.json. nil keeps what the file already says, or
-	// agent.DefaultClaudeCodeCoAuthoredBy (off) when it says nothing.
+	// settings.json. nil, or the value the file already has, leaves them as
+	// written; a file that says nothing gets agent.DefaultClaudeCodeCoAuthoredBy
+	// (off).
 	CoAuthoredBy *bool `json:"coAuthoredBy,omitempty"`
 }
 

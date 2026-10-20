@@ -595,6 +595,14 @@ func TestBuildClaudeSettings_CoAuthoredBy(t *testing.T) {
 		}
 	})
 
+	t.Run("on restores commit credit and keeps custom PR text", func(t *testing.T) {
+		settings := build(t, `{"attribution":{"commit":"","pr":"Reviewed by me"}}`, true)
+		attribution, _ := settings["attribution"].(map[string]interface{})
+		if _, present := attribution["commit"]; present || attribution["pr"] != "Reviewed by me" {
+			t.Fatalf("attribution = %v, want commit dropped and pr kept", settings["attribution"])
+		}
+	})
+
 	t.Run("unset leaves both keys alone", func(t *testing.T) {
 		out, err := BuildClaudeSettings([]byte(`{}`), map[string]string{})
 		if err != nil {

@@ -76,9 +76,8 @@ func buildClaudeSettings(base []byte, env map[string]string, applyOpts *applyOpt
 // applyCoAuthoredBy writes one Co-Authored-By choice to both keys Claude Code
 // reads: includeCoAuthoredBy (older CLIs; deprecated) and attribution (newer
 // CLIs, where it takes precedence; an empty string hides that credit). Off
-// blanks both commit and PR credit. On restores Claude Code's own credit by
-// dropping an attribution that only hides it, and keeps one the user wrote
-// with their own text.
+// blanks both commit and PR credit. On drops the blanks so Claude Code's own
+// credit returns, and keeps any text the user wrote themselves.
 func applyCoAuthoredBy(settings map[string]interface{}, include bool) {
 	settings["includeCoAuthoredBy"] = include
 	attribution, _ := settings["attribution"].(map[string]interface{})
@@ -94,9 +93,12 @@ func applyCoAuthoredBy(settings map[string]interface{}, include bool) {
 	if _, ok := settings["attribution"]; !ok {
 		return
 	}
-	commit, _ := attribution["commit"].(string)
-	pr, _ := attribution["pr"].(string)
-	if attribution == nil || (commit == "" && pr == "") {
+	for _, key := range []string{"commit", "pr"} {
+		if text, _ := attribution[key].(string); text == "" {
+			delete(attribution, key)
+		}
+	}
+	if len(attribution) == 0 {
 		delete(settings, "attribution")
 	}
 }

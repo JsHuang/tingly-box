@@ -121,16 +121,17 @@ name both keys, and `WithCoAuthoredBy` → `applyCoAuthoredBy`
 
 - **Off** (tb's default, unlike Claude Code's): `includeCoAuthoredBy: false`
   and `attribution.commit` / `attribution.pr` set to `""`.
-- **On**: `includeCoAuthoredBy: true`, and an `attribution` that only hid the
-  credit is dropped so Claude Code's own text returns; one with the user's own
-  text is kept.
+- **On**: `includeCoAuthoredBy: true`; blank `attribution` entries are dropped
+  so Claude Code's own credit returns, and any text the user wrote is kept.
 
 `readCoAuthoredBy` (`cc_settings.go`) reads it back the way Claude Code does:
 `attribution.commit` first (missing key = default credit = on), then
-`includeCoAuthoredBy`, else unset. An apply request without `coAuthoredBy`
-(one-click apply, the 1M toggle's re-apply) keeps what the file says and
-falls back to off only when it says nothing, so a user who turned it on is
-not silently reverted. The manual tab's JSON uses `coAuthoredBySettings`, the
+`includeCoAuthoredBy`, else unset. The user's file wins on write too
+(`coAuthoredByToWrite`): an apply without `coAuthoredBy` (one-click apply, the
+1M toggle's re-apply) or with the value the file already has leaves both keys
+byte-for-byte as written, custom attribution text included. Only a real flip
+of the switch, or a file that says nothing (then tb's default, off), writes
+them. The manual tab's JSON uses `coAuthoredBySettings`, the
 frontend twin of the same rule.
 
 ---
