@@ -122,6 +122,19 @@ Projects 事件 ──▶ 订阅了该落点的 binding ──▶ 渲染到 chat
 
 不丢数据：线程、事件、`session_id` 和附件都不动，只是多了所属项目。
 
+### 地址：`project_id[/thread_id]`
+
+线程不是第三种 `kind`：它总属于某个入口，会结束，有分支和 worktree，一个入口下有多个，做成 `kind` 就要有 `parent`，
+模型变成两层。但在路由和绑定上，入口和线程用同一套地址：
+
+| 地址 | 含义 | 对应 |
+|---|---|---|
+| `project_id` | 项目：给 coordinator；workdir：给当前会话 | 绑定只填 `project_id` |
+| `project_id/thread_id` | 直接给这个线程 | 绑定再填 `focus_thread_id`（`/focus`） |
+| 单条消息点名 | 只送这一条，不改绑定 | `@N`、引用回复 |
+
+所以模型里仍只有 `Project(kind)` 一个实体；workdir 可以看成“没有 coordinator、只有一个当前线程”的入口。
+
 ### 接口（建议先不动外部路径）
 
 - `GET /projects` 默认只返回 `kind=project`，`?kind=workdir` 返回工作目录；响应里的 `Project` 多 `kind`、`path`。

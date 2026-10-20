@@ -137,6 +137,11 @@ what kind decides
   review / merge       yes                             no
   sidebar group        Projects                        Working folders
   IM binding           → project conversation          → current session  (/new, /stop)
+
+address = project_id[/thread_id]      (a thread is not a kind; it is a level below)
+  bind project_id only        project → coordinator      workdir → current session
+  bind + focus_thread_id      → that thread directly     (/focus)
+  @N / quote-reply            → that thread, this message only; binding unchanged
 ```
 
 ## Migration: what happens to existing folder sessions
