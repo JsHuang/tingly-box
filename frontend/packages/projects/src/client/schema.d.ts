@@ -160,6 +160,50 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/projects/channel-bindings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the IM chats bound to projects, all of them or one project's
+         * @description List the IM chats bound to projects, all of them or one project's
+         */
+        get: operations["apiV1ProjectsChannel-bindingsGet"];
+        /**
+         * Bind an IM chat to a project; binding a bound chat again moves it
+         * @description Bind an IM chat to a project; binding a bound chat again moves it
+         */
+        put: operations["apiV1ProjectsChannel-bindingsPut"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/channel-bindings/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Unbind an IM chat
+         * @description Unbind an IM chat
+         */
+        delete: operations["apiV1ProjectsChannel-bindingsIdDelete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/projects/models": {
         parameters: {
             query?: never;
@@ -1144,6 +1188,48 @@ export interface components {
             /** @description Field task_type */
             task_type: string;
         };
+        BindChannelRequest: {
+            /** @description Field chat_id */
+            chat_id: string;
+            /** @description Field chat_title */
+            chat_title?: string;
+            /** @description Field platform */
+            platform: string;
+            /** @description Field project_id */
+            project_id: string;
+        };
+        BindingsResponse: {
+            /** @description Field bindings */
+            bindings: components["schemas"]["ChannelBinding"][];
+        };
+        ChannelBinding: {
+            /** @description Field chat_id */
+            chat_id: string;
+            /** @description Field chat_title */
+            chat_title: string;
+            /**
+             * Format: date-time
+             * @description Field created_at
+             */
+            created_at: string;
+            /** @description Field focus_thread_id */
+            focus_thread_id?: string;
+            /** @description Field id */
+            id: string;
+            /** @description Field platform */
+            platform: string;
+            /** @description Field project_id */
+            project_id?: string;
+            /** @description Field target_kind */
+            target_kind: string;
+            /**
+             * Format: date-time
+             * @description Field updated_at
+             */
+            updated_at: string;
+            /** @description Field workdir_id */
+            workdir_id?: string;
+        };
         ConnectionDraft: {
             /** @description Field api_key */
             api_key?: string;
@@ -1454,6 +1540,12 @@ export interface components {
             project_id: string;
             /** @description Field role */
             role: string;
+            /** @description Field source */
+            source?: string;
+            /** @description Field source_chat_id */
+            source_chat_id?: string;
+            /** @description Field source_platform */
+            source_platform?: string;
         };
         ProjectModelsResponse: {
             /** @description Field error */
@@ -2211,6 +2303,77 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Project"];
+                };
+            };
+        };
+    };
+    "apiV1ProjectsChannel-bindingsGet": {
+        parameters: {
+            query?: {
+                /** @description Only this project's bindings */
+                project_id?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BindingsResponse"];
+                };
+            };
+        };
+    };
+    "apiV1ProjectsChannel-bindingsPut": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Request body */
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BindChannelRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChannelBinding"];
+                };
+            };
+        };
+    };
+    "apiV1ProjectsChannel-bindingsIdDelete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OKResponse"];
                 };
             };
         };

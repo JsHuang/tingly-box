@@ -47,7 +47,7 @@ export function BindChatDialog({ open, projectId, projectName, chats, hasBots, b
 
     const items: Choice[] = candidates.map((c) => {
         const bound = byChat.get(chatKey(c.platform, c.chatId));
-        const where = bound ? t('im.place.at', { place: projectNames.get(bound.project_id) ?? t('im.place.elsewhere') }) : t('im.place.none');
+        const where = bound ? t('im.place.at', { place: projectNames.get(bound.project_id ?? '') ?? t('im.place.elsewhere') }) : t('im.place.none');
         return {
             key: chatKey(c.platform, c.chatId),
             lead: <PlatformMark platform={c.platform} size={28} />,
