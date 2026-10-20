@@ -343,7 +343,7 @@ export const useModelSelectDialog = (options: UseModelSelectDialogOptions) => {
                     isModelSelected={mode === 'create-rule' && multiSelect ? isPicked : undefined}
                     // The multi-select switch sits on the models toolbar row; the
                     // footer only exists while selecting, the count beside its action.
-                    toolbarStart={mode === 'create-rule' ? (
+                    toolbarEnd={mode === 'create-rule' ? (
                         <FormControlLabel
                             sx={{ ml: 0 }}
                             slotProps={{ typography: { variant: 'body2' } }}
