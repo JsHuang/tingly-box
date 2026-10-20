@@ -4,11 +4,10 @@ import { NAV_ROW_SX, navRowSelectedSx, navRowTextSlotProps } from '@tingly/ui/th
 import { fontSizes } from '@tingly/ui/theme/fonts';
 import { NavLink, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { api, unwrap, type ProjectSummary } from '../client';
-import { useWorkdirs } from './workdir/useWorkdirs';
+import { useProjectList } from '../hooks/useProjectList';
 import { folderName } from '../utils/format';
 import { Add, ChatBubble, Folder, FolderOpen, Star } from './icons';
-import { PROJECTS_CHANGED, useProjectsHost } from '../host/ProjectsHost';
+import { useProjectsHost } from '../host/ProjectsHost';
 
 /** One row of a sidebar section: a place the user can open. */
 export interface ProjectsSidebarRow {
@@ -54,42 +53,8 @@ export interface ProjectsSidebarProps {
     onNavigate?: () => void;
 }
 
-const POLL_MS = 15_000;
-
 // The folder a working directory sits in, home shortened to ~.
 const parentPath = (path: string) => path.replace(/[\\/]+$/, '').replace(/[\\/][^\\/]*$/, '').replace(/^\/(Users|home)\/[^/]+/, '~') || '/';
-
-/** The active projects, starred first, refreshed when a page changes one and on a slow poll. */
-function useSidebarProjects(enabled: boolean): ProjectSummary[] | null {
-    const [projects, setProjects] = useState<ProjectSummary[] | null>(null);
-    useEffect(() => {
-        if (!enabled) return;
-        // Only the latest request may land, and none after unmount.
-        let latest = 0;
-        const load = () => {
-            if (document.visibilityState === 'hidden') return;
-            const request = ++latest;
-            unwrap(api.GET('/api/v1/projects'))
-                .then((r) => {
-                    if (request === latest) setProjects([...r.projects].sort((a, b) => Number(b.starred) - Number(a.starred)));
-                })
-                .catch(() => {
-                    // Unreachable: keep the last list.
-                });
-        };
-        load();
-        const timer = window.setInterval(load, POLL_MS);
-        window.addEventListener(PROJECTS_CHANGED, load);
-        document.addEventListener('visibilitychange', load);
-        return () => {
-            latest = -1;
-            window.clearInterval(timer);
-            window.removeEventListener(PROJECTS_CHANGED, load);
-            document.removeEventListener('visibilitychange', load);
-        };
-    }, [enabled]);
-    return projects;
-}
 
 /** How many IM bots the host has, for the sidebar's IM row; null until known or when there is no IM. */
 function useImBotCount(enabled: boolean): number | null {
@@ -175,8 +140,8 @@ export function ProjectsSidebar({ showProjects = true, showWorkdirs = false, sho
     const location = useLocation();
     const { paths, im } = useProjectsHost();
     const botCount = useImBotCount(showIm && !!im);
-    const projects = useSidebarProjects(showProjects);
-    const { workdirs } = useWorkdirs(showWorkdirs);
+    // One list serves both groups: Projects and Folders are its two types.
+    const { projects, folders } = useProjectList(showProjects || showWorkdirs);
     const [params] = useSearchParams();
     const scope = location.pathname === paths.folder().split('?')[0] ? params.get('path') ?? '' : undefined;
 
@@ -217,18 +182,21 @@ export function ProjectsSidebar({ showProjects = true, showWorkdirs = false, sho
                 onNavigate?.();
             },
         },
-        rows: (workdirs ?? []).map((w) => ({
-            key: w.path,
-            label: folderName(w.path),
-            title: w.path,
-            icon: <FolderOpen />,
-            // What waits here, else where the folder is.
-            subtitle: w.waiting > 0 ? t('sidebar.sessionsWaiting', { count: w.waiting }) : parentPath(w.path),
-            to: paths.folder(w.path),
-            selected: scope === w.path,
-            attention: w.waiting > 0,
-        })),
-        empty: workdirs ? t('sidebar.noWorkdirs') : undefined,
+        rows: (folders ?? []).map((f) => {
+            const path = f.path ?? '';
+            return {
+                key: f.id,
+                label: folderName(path),
+                title: path,
+                icon: <FolderOpen />,
+                // What waits here, else where the folder is.
+                subtitle: f.threads.waiting > 0 ? t('sidebar.sessionsWaiting', { count: f.threads.waiting }) : parentPath(path),
+                to: paths.folder(path),
+                selected: scope === path,
+                attention: f.threads.waiting > 0,
+            };
+        }),
+        empty: folders ? t('sidebar.noWorkdirs') : undefined,
     } : null;
 
     // IM is configuration, not content: one row pinned at the bottom (TEP #2143).

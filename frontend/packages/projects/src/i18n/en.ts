@@ -188,8 +188,6 @@ export const en = {
         },
         pause: 'Pause project', resume: 'Resume project', pauseHelp: 'Stops every running thread at once and accepts no new work until resumed.',
         archive: 'Archive project', unarchive: 'Unarchive project', archiveHelp: 'Hides the project and stops its threads. Everything stays readable.',
-        delete: 'Delete project', deleteHelp: 'Permanently removes the project, its threads, worktrees, memory and library. Branches the threads created stay in your repositories.',
-        deleteTitle: 'Delete “{{name}}”?', deleteConfirm: 'Yes, delete',
         instructions: 'Project instructions',
         instructionsHelp: 'The brief every new thread and the coordinator start from: what the project is for, where the work happens, how a thread checks its work, what needs your go-ahead.',
         instructionsPlaceholder: '- Branch from main; one thread per change.\n- Before calling work done, run `make test` and paste the summary.\n- If something you need is missing, say exactly what and stop. Don’t mock or guess.\n- Don’t change CI configuration without asking me.',

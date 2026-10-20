@@ -24,12 +24,14 @@ const host = (over: Partial<NonNullable<ProjectsHost['im']>> = {}): ProjectsHost
     },
 });
 
+const summary = (id: string, name: string, over: Record<string, unknown> = {}) => ({ id, name, type: 'project', main_thread_id: `m${id}`, threads: { waiting: 0, working: 0, ready: 0, idle: 0, resolved: 0 }, ...over });
+
 const show = (h: ProjectsHost) => render(<MemoryRouter><ProjectsHostProvider host={h}><ImSettingsPage /></ProjectsHostProvider></MemoryRouter>);
 
 beforeEach(() => {
-    m.list.mockResolvedValue([{ id: 'cb1', platform: 'telegram', chat_id: 'tg:1', chat_title: 'yz', target_kind: 'project', project_id: 'p1', created_at: '', updated_at: '' } satisfies ChannelBinding]);
+    m.list.mockResolvedValue([{ id: 'cb1', platform: 'telegram', chat_id: 'tg:1', chat_title: 'yz', project_id: 'p1', thread_id: 'mp1', created_at: '', updated_at: '' } satisfies ChannelBinding]);
     m.bind.mockResolvedValue({});
-    m.get.mockResolvedValue({ data: { projects: [{ id: 'p1', name: 'Alpha' }, { id: 'p2', name: 'Docs' }] }, response: new Response() });
+    m.get.mockResolvedValue({ data: { projects: [summary('p1', 'Alpha'), summary('p2', 'Docs'), summary('f1', 'notes', { type: 'folder', main_thread_id: undefined, path: '/home/me/notes' })] }, response: new Response() });
 });
 afterEach(() => {
     cleanup();
@@ -60,7 +62,7 @@ describe('ImSettingsPage', () => {
         await waitFor(() => expect(m.bind).toHaveBeenCalledWith({ platform: 'telegram', chat_id: 'tg:2', project_id: 'p2' }));
     });
 
-    it('does not offer the project a chat is already bound to', async () => {
+    it('does not offer the project a chat is already bound to, nor a folder (those are bound by thread)', async () => {
         show(host());
         const rows = await screen.findAllByRole('row');
         fireEvent.click(within(rows[1]).getByRole('button', { name: /im\.settings\.rebindLabel/ }));

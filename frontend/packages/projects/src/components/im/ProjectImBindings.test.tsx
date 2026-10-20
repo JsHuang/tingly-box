@@ -10,9 +10,12 @@ vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string, o?: 
 vi.mock('../../client/channelBindings', () => ({ listChannelBindings: m.list, bindChannel: m.bind, unbindChannel: m.unbind }));
 vi.mock('../../client', async (actual) => ({ ...(await actual<typeof import('../../client')>()), api: { GET: m.get } }));
 
+// A project's chats are bound to its main thread, named m<project>.
 const binding = (id: string, chat_id: string, chat_title: string, project_id: string): ChannelBinding => ({
-    id, platform: 'telegram', chat_id, chat_title, target_kind: 'project', project_id, created_at: '', updated_at: '',
+    id, platform: 'telegram', chat_id, chat_title, project_id, thread_id: `m${project_id}`, created_at: '', updated_at: '',
 });
+
+const summary = (id: string, name: string, over: Record<string, unknown> = {}) => ({ id, name, type: 'project', main_thread_id: `m${id}`, threads: { waiting: 0, working: 0, ready: 0, idle: 0, resolved: 0 }, ...over });
 
 const chat = (chatId: string, title: string, over: Partial<ImChat> = {}): ImChat => ({
     botUuid: 'b1', platform: 'telegram', chatId, title, kind: 'direct', state: 'ok', ...over,
@@ -25,7 +28,7 @@ const host = (chats: ImChat[], bots = [{ uuid: 'b1', name: 'Bot', platform: 'tel
 });
 
 function Harness() {
-    const im = useProjectIm({ id: 'p1', name: 'Alpha' });
+    const im = useProjectIm({ threadId: 'mp1', projectId: 'p1', name: 'Alpha' });
     if (!im) return <div>no im</div>;
     return <><ProjectImTags im={im} />{im.dialog}</>;
 }
@@ -41,7 +44,7 @@ beforeEach(() => {
     ]);
     m.bind.mockImplementation(async (r: { chat_id: string }) => binding('new', r.chat_id, 'x', 'p1'));
     m.unbind.mockResolvedValue(undefined);
-    m.get.mockResolvedValue({ data: { projects: [{ id: 'p1', name: 'Alpha' }, { id: 'p2', name: 'Docs' }] }, response: new Response() });
+    m.get.mockResolvedValue({ data: { projects: [summary('p1', 'Alpha'), summary('p2', 'Docs')] }, response: new Response() });
 });
 afterEach(() => {
     cleanup();

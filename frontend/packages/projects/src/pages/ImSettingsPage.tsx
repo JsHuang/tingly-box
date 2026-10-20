@@ -6,7 +6,8 @@ import { Link as RouterLink } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { MoveChatDialog } from '../components/im/MoveChatDialog';
 import { PlatformMark, usePlatformLabel } from '../components/im/PlatformMark';
-import { chatKey, useChannelBindings, useImChats, useProjectNames } from '../components/im/useImBindings';
+import { isFolder } from '../client';
+import { chatKey, useChannelBindings, useImChats, useProjectDirectory } from '../components/im/useImBindings';
 import { ChatBubble } from '../components/icons';
 import { useNotify } from '../hooks/useNotify';
 import { useProjectsHost, type ImBot, type ImChat } from '../host/ProjectsHost';
@@ -30,7 +31,9 @@ export default function ImSettingsPage() {
     const platformLabel = usePlatformLabel();
     const { bots, chats, reload } = useImChats(!!im);
     const { bindings, byChat, bind } = useChannelBindings(!!im);
-    const projectNames = useProjectNames(!!im);
+    const directory = useProjectDirectory(!!im);
+    // A chat is bound to a project from here; a folder is bound by one of its threads, from its page.
+    const bindable = useMemo(() => [...directory.values()].filter((p) => !isFolder(p)), [directory]);
     const [accessBot, setAccessBot] = useState<ImBot | null>(null);
     const [moving, setMoving] = useState<ImChat | null>(null);
 
@@ -42,13 +45,13 @@ export default function ImSettingsPage() {
 
     const onMove = useCallback(async (chat: ImChat, projectId: string) => {
         try {
-            await bind(chat, projectId);
-            notify(t('im.settings.moveDone', { chat: chat.title, project: projectNames.get(projectId) ?? '' }), 'success');
+            await bind(chat, { project_id: projectId });
+            notify(t('im.settings.moveDone', { chat: chat.title, project: directory.get(projectId)?.name ?? '' }), 'success');
         } catch (e) {
             notify(`${t('im.bind.failed')}: ${(e as Error).message}`, 'error');
             throw e;
         }
-    }, [bind, notify, projectNames, t]);
+    }, [bind, notify, directory, t]);
 
     const loading = bots === null || chats === null || bindings === null;
 
@@ -96,7 +99,9 @@ export default function ImSettingsPage() {
                                                 <TableBody>
                                                     {rows.map((c) => {
                                                         const b = byChat.get(chatKey(c.platform, c.chatId));
-                                                        const placeName = b ? projectNames.get(b.project_id ?? '') : undefined;
+                                                        const place = b ? directory.get(b.project_id) : undefined;
+                                                        // A thread other than the project's main one is opened on its own.
+                                                        const thread = b && place && b.thread_id !== place.main_thread_id ? `?thread=${encodeURIComponent(b.thread_id)}` : '';
                                                         return (
                                                             <TableRow key={chatKey(c.platform, c.chatId)}>
                                                                 <TableCell sx={{ pl: 2 }}>
@@ -105,8 +110,8 @@ export default function ImSettingsPage() {
                                                                 </TableCell>
                                                                 <TableCell>
                                                                     {b?.project_id ? (
-                                                                        <Link component={RouterLink} to={paths.project(b.project_id)} underline="hover" color="text.primary" noWrap sx={{ display: 'block', fontSize: '0.875rem' }}>
-                                                                            {placeName ?? t('im.place.elsewhere')}
+                                                                        <Link component={RouterLink} to={`${paths.project(b.project_id)}${thread}`} underline="hover" color="text.primary" noWrap sx={{ display: 'block', fontSize: '0.875rem' }}>
+                                                                            {place?.name ?? t('im.place.elsewhere')}
                                                                         </Link>
                                                                     ) : (
                                                                         <Typography color="text.disabled" sx={{ fontSize: '0.875rem' }}>{t('im.settings.notBound')}</Typography>
@@ -146,7 +151,7 @@ export default function ImSettingsPage() {
             <MoveChatDialog
                 chat={moving}
                 bound={moving ? byChat.get(chatKey(moving.platform, moving.chatId)) : undefined}
-                projectNames={projectNames}
+                projects={bindable}
                 onClose={() => setMoving(null)}
                 onMove={onMove}
             />

@@ -2,22 +2,26 @@
 // A thin layer over the generated client so the IM components import from one place.
 import { api, unwrap, type components } from './index';
 
-/** One IM chat bound to a place. M1 binds to projects only (working folders come in M2). */
+/** One IM chat bound to a thread; `project_id` is the project that thread belongs to. */
 export type ChannelBinding = components['schemas']['ChannelBinding'];
 
 /**
- * Where a project message came from when it was written by an IM chat
- * (.design/projects-im.md, "Thread / project_messages"). A Web message has none.
+ * Where a thread event came from when an IM chat wrote it
+ * (.design/projects-sessions.md, "Event"). A Web message has none.
  */
-export type MessageSource = Pick<components['schemas']['ProjectMessage'], 'source' | 'source_platform' | 'source_chat_id'>;
+export type MessageSource = Pick<components['schemas']['ThreadEvent'], 'source' | 'source_platform' | 'source_chat_id'>;
 
 export async function listChannelBindings(): Promise<ChannelBinding[]> {
     const res = await unwrap(api.GET('/api/v1/projects/channel-bindings', { params: { query: {} } }));
     return res.bindings ?? [];
 }
 
-/** Binds a chat to a project; a chat bound elsewhere is moved (one place at a time), old threads stay. */
-export async function bindChannel(req: { platform: string; chat_id: string; project_id: string }): Promise<ChannelBinding> {
+/**
+ * Binds a chat to a thread, or to a project (its main thread; a folder
+ * project cannot be bound this way: bind one of its threads). A chat bound
+ * elsewhere is moved (one place at a time), old threads stay.
+ */
+export async function bindChannel(req: components['schemas']['BindChannelRequest']): Promise<ChannelBinding> {
     return unwrap(api.PUT('/api/v1/projects/channel-bindings', { body: req }));
 }
 

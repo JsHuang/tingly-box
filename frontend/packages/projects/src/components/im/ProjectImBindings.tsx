@@ -9,11 +9,24 @@ import { useProjectsHost, type ImChat } from '../../host/ProjectsHost';
 import { Add, Close } from '../icons';
 import { BindChatDialog } from './BindChatDialog';
 import { PlatformMark } from './PlatformMark';
-import { chatKey, useChannelBindings, useImChats, useProjectNames } from './useImBindings';
+import { chatKey, useChannelBindings, useImChats, useProjectDirectory } from './useImBindings';
 
-/** The IM chats bound to one project, and what the header needs to show and change them. */
+/**
+ * What a header binds chats to: a thread, named for the dialog. A project's
+ * conversation is its main thread and is bound as the project (the server
+ * resolves it); a folder cannot be bound as a project, so its open thread is
+ * bound by id.
+ */
+export interface ImTarget {
+    threadId: string;
+    name: string;
+    /** Set for a project's main thread. */
+    projectId?: string;
+}
+
+/** The IM chats bound to one thread, and what the header needs to show and change them. */
 export interface ProjectIm {
-    /** This project's bindings; null until the first answer. */
+    /** The chats bound to this thread; null until the first answer. */
     mine: ChannelBinding[] | null;
     open: () => void;
     unbind: (b: ChannelBinding) => Promise<void>;
@@ -24,11 +37,12 @@ export interface ProjectIm {
 }
 
 /**
- * Everything the project page's header needs for IM (TEP #2143): the bindings
- * for this project, unbinding, and the bind dialog. `null` when the host has
- * no IM (the standalone app), so the header shows nothing at all.
+ * Everything a page header needs for IM (TEP #2143): the bindings for its
+ * thread, unbinding, and the bind dialog. `null` when the host has no IM (the
+ * standalone app) or there is no thread to bind yet, so the header shows
+ * nothing at all.
  */
-export function useProjectIm(project: { id: string; name: string } | null): ProjectIm | null {
+export function useProjectIm(target: ImTarget | null): ProjectIm | null {
     const { im, paths } = useProjectsHost();
     const { t } = useTranslation('projects');
     const notify = useNotify();
@@ -37,20 +51,21 @@ export function useProjectIm(project: { id: string; name: string } | null): Proj
     const { bindings, byChat, bind, unbind } = useChannelBindings(!!im);
     // The dialog's data is only needed while it is open.
     const { bots, chats } = useImChats(!!im && dialogOpen);
-    const projectNames = useProjectNames(!!im && dialogOpen);
+    const directory = useProjectDirectory(!!im && dialogOpen);
 
-    const projectId = project?.id ?? '';
-    const projectName = project?.name ?? '';
+    const threadId = target?.threadId ?? '';
+    const projectId = target?.projectId;
+    const projectName = target?.name ?? '';
 
     const onBind = useCallback(async (chat: ImChat, movedFrom: boolean) => {
         try {
-            await bind(chat, projectId);
+            await bind(chat, projectId ? { project_id: projectId } : { thread_id: threadId });
             notify(t(movedFrom ? 'im.bind.moved' : 'im.bind.done', { chat: chat.title, project: projectName }), 'success');
         } catch (e) {
             notify(`${t('im.bind.failed')}: ${(e as Error).message}`, 'error');
             throw e;
         }
-    }, [bind, notify, projectId, projectName, t]);
+    }, [bind, notify, projectId, threadId, projectName, t]);
 
     const onUnbind = useCallback(async (b: ChannelBinding) => {
         try {
@@ -61,21 +76,21 @@ export function useProjectIm(project: { id: string; name: string } | null): Proj
         }
     }, [notify, t, unbind]);
 
-    if (!im || !project) return null;
+    if (!im || !target) return null;
     return {
-        mine: bindings && bindings.filter((b) => b.project_id === projectId),
+        mine: bindings && bindings.filter((b) => b.thread_id === threadId),
         open: () => setDialogOpen(true),
         unbind: onUnbind,
         chatTitle: (platform, chatId) => byChat.get(chatKey(platform, chatId))?.chat_title || undefined,
         dialog: (
             <BindChatDialog
                 open={dialogOpen}
-                projectId={projectId}
-                projectName={projectName}
+                threadId={threadId}
+                targetName={projectName}
                 chats={chats}
                 hasBots={(bots ?? []).length > 0}
                 byChat={byChat}
-                projectNames={projectNames}
+                directory={directory}
                 onClose={() => setDialogOpen(false)}
                 onBind={onBind}
                 onOpenSettings={paths.im ? () => { setDialogOpen(false); navigate(paths.im!); } : undefined}

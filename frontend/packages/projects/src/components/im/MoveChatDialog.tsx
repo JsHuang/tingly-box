@@ -4,6 +4,7 @@ import { DialogHeader, EmptyState } from '@tingly/ui';
 import { fontSizes } from '@tingly/ui/theme/fonts';
 import { useTranslation } from 'react-i18next';
 import type { ChannelBinding } from '../../client/channelBindings';
+import type { ProjectSummary } from '../../client';
 import type { ImChat } from '../../host/ProjectsHost';
 import { Folder, Info } from '../icons';
 import { ChoiceList, type Choice } from './ChoiceList';
@@ -13,15 +14,15 @@ interface Props {
     chat: ImChat | null;
     /** Where it is bound now. */
     bound?: ChannelBinding;
-    /** Project names by id, in the order to list them. */
-    projectNames: Map<string, string>;
+    /** The projects a chat can be bound to (folders are bound by thread, from their page). */
+    projects: ProjectSummary[];
     onClose: () => void;
     /** Resolves when done; rejects (after reporting) to keep the dialog open. */
     onMove: (chat: ImChat, projectId: string) => Promise<void>;
 }
 
 /** Bind or move one chat to a project (the chat side of "bind from either side"). */
-export function MoveChatDialog({ chat, bound, projectNames, onClose, onMove }: Props) {
+export function MoveChatDialog({ chat, bound, projects, onClose, onMove }: Props) {
     const { t } = useTranslation('projects');
     const [picked, setPicked] = useState<string | null>(null);
     const [busy, setBusy] = useState(false);
@@ -32,10 +33,10 @@ export function MoveChatDialog({ chat, bound, projectNames, onClose, onMove }: P
     };
 
     // Moving to where it already is changes nothing, so that project is not offered.
-    const items: Choice[] = [...projectNames].filter(([id]) => id !== bound?.project_id).map(([id, name]) => ({
-        key: id,
+    const items: Choice[] = projects.filter((p) => p.main_thread_id !== bound?.thread_id).map((p) => ({
+        key: p.id,
         lead: <Folder sx={{ fontSize: 22, color: 'text.secondary' }} />,
-        title: name,
+        title: p.name,
     }));
 
     const submit = async () => {

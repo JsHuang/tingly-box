@@ -4,6 +4,7 @@ import { DialogHeader, EmptyState } from '@tingly/ui';
 import { fontSizes } from '@tingly/ui/theme/fonts';
 import { useTranslation } from 'react-i18next';
 import type { ChannelBinding } from '../../client/channelBindings';
+import type { ProjectSummary } from '../../client';
 import type { ImChat } from '../../host/ProjectsHost';
 import { Info } from '../icons';
 import { ChoiceList, type Choice } from './ChoiceList';
@@ -12,22 +13,24 @@ import { chatKey } from './useImBindings';
 
 interface Props {
     open: boolean;
-    projectId: string;
-    projectName: string;
+    /** The thread the chat will be bound to. */
+    threadId: string;
+    /** Its name, for the title: the project's, or the folder thread's. */
+    targetName: string;
     /** Every chat the host's bots have seen; null while loading. */
     chats: ImChat[] | null;
     hasBots: boolean;
     byChat: Map<string, ChannelBinding>;
-    /** Project names by id, for "Bound to X". */
-    projectNames: Map<string, string>;
+    /** Every project and folder by id, for "Bound to X". */
+    directory: Map<string, ProjectSummary>;
     onClose: () => void;
     /** Resolves when bound; rejects (after reporting) to keep the dialog open. */
     onBind: (chat: ImChat, movedFrom: boolean) => Promise<void>;
     onOpenSettings?: () => void;
 }
 
-/** Bind a known IM chat to this project (the project side of "bind from either side"). */
-export function BindChatDialog({ open, projectId, projectName, chats, hasBots, byChat, projectNames, onClose, onBind, onOpenSettings }: Props) {
+/** Bind a known IM chat to this thread (the project side of "bind from either side"). */
+export function BindChatDialog({ open, threadId, targetName, chats, hasBots, byChat, directory, onClose, onBind, onOpenSettings }: Props) {
     const { t } = useTranslation('projects');
     const platformLabel = usePlatformLabel();
     const [picked, setPicked] = useState<string | null>(null);
@@ -40,14 +43,14 @@ export function BindChatDialog({ open, projectId, projectName, chats, hasBots, b
 
     // Chats already bound here are in the header; the rest are candidates, free ones first.
     const candidates = useMemo(() => {
-        const rest = (chats ?? []).filter((c) => byChat.get(chatKey(c.platform, c.chatId))?.project_id !== projectId);
+        const rest = (chats ?? []).filter((c) => byChat.get(chatKey(c.platform, c.chatId))?.thread_id !== threadId);
         const elsewhere = (c: ImChat) => (byChat.has(chatKey(c.platform, c.chatId)) ? 1 : 0);
         return rest.sort((a, b) => elsewhere(a) - elsewhere(b));
-    }, [chats, byChat, projectId]);
+    }, [chats, byChat, threadId]);
 
     const items: Choice[] = candidates.map((c) => {
         const bound = byChat.get(chatKey(c.platform, c.chatId));
-        const where = bound ? t('im.place.at', { place: projectNames.get(bound.project_id ?? '') ?? t('im.place.elsewhere') }) : t('im.place.none');
+        const where = bound ? t('im.place.at', { place: directory.get(bound.project_id)?.name ?? t('im.place.elsewhere') }) : t('im.place.none');
         return {
             key: chatKey(c.platform, c.chatId),
             lead: <PlatformMark platform={c.platform} size={28} />,
@@ -75,7 +78,7 @@ export function BindChatDialog({ open, projectId, projectName, chats, hasBots, b
     const loading = chats === null;
     return (
         <Dialog open={open} onClose={busy ? undefined : close} maxWidth="sm" fullWidth aria-labelledby="bind-chat-title">
-            <DialogHeader titleId="bind-chat-title" title={t('im.bind.title', { project: projectName })} closeLabel={t('common.close')} onClose={close} closeDisabled={busy} />
+            <DialogHeader titleId="bind-chat-title" title={t('im.bind.title', { project: targetName })} closeLabel={t('common.close')} onClose={close} closeDisabled={busy} />
             <DialogContent sx={{ pt: 0.5 }}>
                 {loading ? (
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75 }}>
@@ -89,7 +92,7 @@ export function BindChatDialog({ open, projectId, projectName, chats, hasBots, b
                         primaryAction={onOpenSettings ? { label: t('im.bind.openSettings'), onClick: onOpenSettings, variant: 'outlined' } : undefined}
                     />
                 ) : (
-                    <ChoiceList items={items} value={picked} onChange={setPicked} label={t('im.bind.title', { project: projectName })} />
+                    <ChoiceList items={items} value={picked} onChange={setPicked} label={t('im.bind.title', { project: targetName })} />
                 )}
                 <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-start', mt: 2, color: 'text.secondary' }}>
                     <Info sx={{ fontSize: 16, mt: '2px', flexShrink: 0 }} />

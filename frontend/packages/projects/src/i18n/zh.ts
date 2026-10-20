@@ -192,8 +192,6 @@ export const zh: Dict<typeof en> = {
         },
         pause: '暂停项目', resume: '恢复项目', pauseHelp: '立即停止所有运行中的线程，恢复前不接受新工作。',
         archive: '归档项目', unarchive: '取消归档', archiveHelp: '隐藏项目并停止其线程，所有内容仍可查看。',
-        delete: '删除项目', deleteHelp: '永久删除项目及其线程、worktree、记忆和文件库。线程创建的分支会保留在你的仓库里。',
-        deleteTitle: '删除「{{name}}」？', deleteConfirm: '确认删除',
         instructions: '项目指令',
         instructionsHelp: '每个新线程和协调者开始时都会读的简报：项目目标、在哪里干活、线程怎么自检、哪些事要先经过你同意。',
         instructionsPlaceholder: '- 从 main 切分支；一个改动一个线程。\n- 完成前运行 `make test` 并贴出结果摘要。\n- 缺少需要的东西时，说清楚缺什么然后停下，不要 mock 或猜。\n- 改 CI 配置前先问我。',

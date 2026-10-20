@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import { apiFetch } from '../client';
 
 export interface ProjectEvent {
-    type: 'message' | 'message_delta' | 'thread' | 'thread_event' | 'project' | 'coordinator';
+    type: 'message_delta' | 'thread' | 'thread_event' | 'project' | 'coordinator';
     project_id: string;
     data: unknown;
 }
@@ -43,9 +43,13 @@ export function useProjectEvents(projectId: string, onEvent: (ev: ProjectEvent) 
     useEventStream(projectId ? `/api/v1/projects/${projectId}/events` : '', onEvent, onOpen);
 }
 
-/** Folder sessions' live events: the same stream, for sessions that belong to no project. */
-export function useSessionEvents(onEvent: (ev: ProjectEvent) => void, onOpen?: () => void) {
-    useEventStream('/api/v1/projects/sessions/events', onEvent, onOpen);
+/**
+ * Every project's live events in one stream (the sidebar's and the folder
+ * page's); streamed coordinator text is left out. Each event carries its
+ * `project_id`.
+ */
+export function useAllProjectEvents(onEvent: (ev: ProjectEvent) => void, onOpen?: () => void, enabled = true) {
+    useEventStream(enabled ? '/api/v1/projects/events' : '', onEvent, onOpen);
 }
 
 function useEventStream(url: string, onEvent: (ev: ProjectEvent) => void, onOpen?: () => void) {

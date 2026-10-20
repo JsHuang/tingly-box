@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { api, unwrap } from '../../client';
+import type { ProjectSummary } from '../../client';
+import { useProjectList } from '../../hooks/useProjectList';
 import { bindChannel, listChannelBindings, unbindChannel, type ChannelBinding } from '../../client/channelBindings';
 import { useProjectsHost, type ImBot, type ImChat } from '../../host/ProjectsHost';
 
@@ -10,6 +11,12 @@ const POLL_MS = 15_000;
 
 /** The key a chat is known by across bindings and the host's chat list. */
 export const chatKey = (platform: string, chatId: string) => `${platform}\u0000${chatId}`;
+
+/**
+ * Where a chat is bound: a project (it resolves to the project's main thread;
+ * not for a folder) or one thread, which is how a folder is bound.
+ */
+export type BindTarget = { project_id: string } | { thread_id: string };
 
 /** Every IM binding, refreshed on a slow poll and whenever one changes here. `null` until the first answer. */
 export function useChannelBindings(enabled: boolean) {
@@ -48,8 +55,8 @@ export function useChannelBindings(enabled: boolean) {
         };
     }, [enabled]);
 
-    const bind = useCallback(async (chat: { platform: string; chatId: string }, projectId: string) => {
-        const b = await bindChannel({ platform: chat.platform, chat_id: chat.chatId, project_id: projectId });
+    const bind = useCallback(async (chat: { platform: string; chatId: string }, target: BindTarget) => {
+        const b = await bindChannel({ platform: chat.platform, chat_id: chat.chatId, ...target });
         window.dispatchEvent(new Event(IM_BINDINGS_CHANGED));
         return b;
     }, []);
@@ -95,20 +102,8 @@ export function useImChats(enabled: boolean) {
     return { bots: state?.bots ?? null, chats: state?.chats ?? null, reload: load };
 }
 
-/** Project names by id, for saying where a chat is bound. */
-export function useProjectNames(enabled: boolean): Map<string, string> {
-    const [names, setNames] = useState<Map<string, string>>(new Map());
-    useEffect(() => {
-        if (!enabled) return;
-        let alive = true;
-        unwrap(api.GET('/api/v1/projects'))
-            .then((r) => alive && setNames(new Map(r.projects.map((p) => [p.id, p.name]))))
-            .catch(() => {
-                // Without names a bound chat just says "another project".
-            });
-        return () => {
-            alive = false;
-        };
-    }, [enabled]);
-    return names;
+/** Every project and folder by id, for saying where a chat is bound and which projects a chat can move to. */
+export function useProjectDirectory(enabled: boolean): Map<string, ProjectSummary> {
+    const { all } = useProjectList(enabled);
+    return useMemo(() => new Map((all ?? []).map((p) => [p.id, p])), [all]);
 }
