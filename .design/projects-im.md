@@ -30,13 +30,25 @@
 
 ## 数据模型（Projects 一侧）
 
+概念上，所有落点是同一种东西：**会话入口**（entry）。每个入口有一个 ID 和一个类别（kind），类别决定“谁来接话”：
+`project` 由 coordinator 接话并开线程，`workdir` 直接是一个文件夹里的会话。以后加新的类别（例如只聊天的入口）
+只是多一个 kind，不需要新的表和新的绑定方式。代码和接口里这个实体暂时仍叫 `Project`（改名要动整个 API 和数据库，
+收益小），界面上的名字按类别分别叫“项目”“工作目录”。
+
 ```
-ChannelBinding            -- 一个 IM chat 当前绑在哪
+Project                      -- 一切落点都是 Project，用 kind 区分
+  kind                           project | workdir       （新增，默认 project）
+  path                           workdir 的文件夹路径；project 为空
+  (goal / instructions / coordinator / 合并 只对 kind=project 有意义)
+
+Thread
+  project_id                     必填（原来文件夹会话为空）
+
+ChannelBinding               -- 一个 IM chat 当前绑在哪
   id, platform, chat_id          唯一键 (platform, chat_id)
-  target_kind                    project | workdir
-  project_id / workdir_id        二选一
-  thread_id                      workdir 绑定时的“当前会话”；project 绑定为空
-  focus_thread_id                project 绑定时可选的“聚焦线程”；空 = 跟 coordinator 说话
+  project_id                     必填；落点的 kind 决定路由
+  thread_id                      kind=workdir 时的“当前会话”；kind=project 为空
+  focus_thread_id                kind=project 时可选的“聚焦线程”；空 = 跟 coordinator 说话
   created_at, updated_at
 
 Thread / project_messages        新增来源字段（可空，空 = Web）
@@ -44,6 +56,11 @@ Thread / project_messages        新增来源字段（可空，空 = Web）
   source_platform, source_chat_id
 ```
 
+- **为什么把工作目录也做成 Project**：绑定、线程、编号（`Thread.Seq`）、等待信号、来源字段都只认 `project_id`，不会再有
+  “线程没有项目”和 `workdir_id` 两条旁路，以后加的字段也不会再分裂成两份。代价是项目相关代码要容忍“没有 coordinator”，
+  但这集中在一个 `kind` 判断上。取代 [projects-desk-absorption.md](./projects-desk-absorption.md) 里“线程没有项目”（选项 1）的数据模型决定。
+- **迁移**：升级时把 `Workdir` 表和 `project_id` 为空的文件夹会话迁成 `kind=workdir` 的项目（按文件夹路径合并，名字取文件夹名），
+  线程的 `project_id` 回填后改为必填。没有可回退的数据丢失：原来的会话、事件、`session_id` 都不动。侧栏仍分“项目”“工作目录”两组。
 - 为什么绑定存在 Projects 里：Web 端要显示“这个项目绑了哪些 chat”并改绑，IM 端要按它路由，
   放在 Remote 里两边都要跨模块查；Projects 是唯一数据源，所以放这边。
 - 独立版 Projects 也有这张表，但没有任何东西往里写，行为不变（`Host` 可选能力，类型断言，同 Desk）。
@@ -58,7 +75,7 @@ IM 入站 ──▶ 访问控制（Remote：配对/白名单/Disabled，不变�
         ──▶ 查 ChannelBinding(platform, chat_id)
               ├ 无：转 coordinator（无项目上下文的轻量对话），回复里附最近落点供选择
               ├ project：追加项目对话消息(source=im)
-              └ workdir：Send 到 thread_id（没有则 Start 新线程）
+              └ kind=workdir：Send 到 thread_id（没有则 Start 新线程）
 Projects 事件 ──▶ 订阅了该落点的 binding ──▶ 渲染到 chat
 ```
 
@@ -107,7 +124,8 @@ project 绑定的 chat 默认在跟 coordinator 说话；要对某个线程说�
 | | 范围 | 不做 | 状态 |
 |---|---|---|---|
 | **M1 只到 coordinator**（先做） | `ChannelBinding`（只支持 project）、消息来源字段、绑定的增删查接口；绑了项目的 chat 的消息进项目对话，coordinator 的回复和折叠后的线程汇报发回 chat；前端：侧栏 IM 入口、项目页头标签、绑定弹窗、对话里的来源图标 | working folder 绑定、IM 里的审批/提问（只发一行“有线程等你，请到 Web 处理”）、点名线程、下线旧路径 | 后端已实现（见下“M1 后端的落地”）；前端另行 |
-| **M2 working folder 绑定** | 绑定到文件夹，消息进当前会话（取代 `@cc`）；`/new`、`/stop`；目录浏览器改为新建 working folder | 同 M1 | |
+| **M2a 统一到 Project ID** | `Project.kind`、线程 `project_id` 必填、`Workdir` 和文件夹会话迁成 `kind=workdir` 的项目、绑定表去掉 `workdir_id`；Projects 内部重构，不涉及 IM 行为 | IM 路由、前端新功能 | |
+| **M2b 工作目录绑定** | 绑定到 `kind=workdir` 的项目，消息进当前会话（取代 `@cc`）；`/new`、`/stop`；目录浏览器改为新建工作目录；前端绑定弹窗列出两类 | 同 M1 | |
 | **M3 审批与提问进 IM** | 线程审批/提问发到所有绑定的 chat，按钮，先答为准，另一边改写为“已处理” | | |
 | **M4 点名线程** | `Thread.Seq`、`@N`、引用回复、`/threads`、`/focus` | | |
 | **M5 收尾** | 未绑定走 coordinator；删 SmartGuide、Remote 页面、`remote/session`；旧绑定转换 | | |
@@ -120,7 +138,7 @@ M3 之前，需要审批的线程在 IM 里只有提示，靠 Web 处理，这�
 
 对应上面的提案，落地时的具体形状（与提案不同或提案没写到的地方）：
 
-- **表与字段**：`channel_bindings`（`(platform, chat_id)` 唯一；`target_kind` 目前只有 `project`；`workdir_id`、`focus_thread_id` 可空，留给 M2/M4，不需要迁移）。`project_messages` 新增 `source`（`im`，空=Web）、`source_platform`、`source_chat_id`。删除项目会一并解绑它的 chat。
+- **表与字段**：`channel_bindings`（`(platform, chat_id)` 唯一；`target_kind` 目前只有 `project`；`workdir_id`、`focus_thread_id` 可空，留给 M2/M4（M2a 决定改为只认 `project_id`，`target_kind`、`workdir_id` 随之去掉））。`project_messages` 新增 `source`（`im`，空=Web）、`source_platform`、`source_chat_id`。删除项目会一并解绑它的 chat。
 - **接口**（`/api/v1/projects` 下）：`GET /channel-bindings?project_id=`、`PUT /channel-bindings`（`platform`、`chat_id`、`project_id`，可选 `chat_title`；已绑定的 chat 再绑即**改绑**，同一行）、`DELETE /channel-bindings/:id`。归档的项目不能被绑定。
 - **入站**：`remoteagent.ProjectRouter`（小接口，`BotHandler` 可选持有）在 `HandleMessage` 里、`@cc`/`@tb` 握手词检测**之前**取走**已绑定 chat 的非斜杠文本**；斜杠命令（`/help`、`/bind`、`/cd`…）、正在输入 `/cd` 路径的 chat、以及访问控制/配对/黑名单都照旧在它前面或旁边。没有绑定的 chat 不受任何影响。绑定了项目的 chat 发附件，回一句“暂不支持”，而不是悄悄送去 `@cc`。投递失败（如项目已暂停）会把原因回给 chat。
 - **走 Web 同一条路径**：入站只是 `Coordinator.PostFrom`（`Post` 加来源），所以排队、暂停/归档检查、事件推送都和 Web 一致。
