@@ -329,7 +329,7 @@ jobs:
           VERSION="${{ needs.setup.outputs.npx_version }}"
           # A successful `npm publish` doesn't mean a package is queryable
           # yet — npm's read replicas can lag behind the write by minutes; poll once a minute for up
-          # to 5. A timeout fails this job and hands the decision to the
+          # to 5. A timeout fails this step, which skips the publish and hands the decision to the
           # `production-smoke-review` approval (publish-cli-review).
           # Wait for every platform package the shim depends on (not just
           # linux-x64) to actually be visible before trusting them: a user
@@ -404,7 +404,10 @@ jobs:
     permissions:
       contents: read
       id-token: write
+    # Without a status function GitHub adds an implicit success(), which would
+    # skip this job exactly when publish-cli failed.
     if: >-
+      !cancelled() &&
       needs.setup.outputs.publish_cli == 'true' &&
       (needs.publish-cli.result == 'failure' ||
        (needs.publish-cli.result == 'success' && needs.publish-cli.outputs.published != 'true'))
