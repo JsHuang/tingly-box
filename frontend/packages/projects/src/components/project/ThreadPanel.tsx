@@ -134,6 +134,12 @@ export function ThreadPanel({ projectId, threadId, thread, events, running, disa
         return { blocks: buildTranscript(entries), pendingRequestId };
     }, [events, running, coordinator]);
 
+    // The waiting question's own deadline, for the strip's folded line.
+    const pendingAutoAt = useMemo(() => {
+        const b = blocks.find((x) => x.type === 'request' && !!pendingRequestId && x.message.request_id === pendingRequestId);
+        return b?.type === 'request' ? b.message.autoAt : undefined;
+    }, [blocks, pendingRequestId]);
+
     const tasks = useMemo(() => session
         ? backgroundTasks(threadTranscript(events ?? [], running, () => undefined).entries, liveTasks)
         : [], [session, events, running, liveTasks]);
@@ -303,7 +309,7 @@ export function ThreadPanel({ projectId, threadId, thread, events, running, disa
                         </Box>
                     </Alert>
                 )}
-                <ComposerStrip thread={thread} onAutoAnswer={(mode) => { void act(() => ops.setAutoAnswer(mode)).then((ok) => ok && onRefresh?.()); }} />
+                <ComposerStrip thread={thread} autoAt={pendingAutoAt} onAutoAnswer={(mode) => { void act(() => ops.setAutoAnswer(mode)).then((ok) => ok && onRefresh?.()); }} />
                 <Composer
                     context={composerContext}
                     minRows={1}

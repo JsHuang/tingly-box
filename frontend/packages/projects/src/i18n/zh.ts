@@ -133,7 +133,7 @@ export const zh: Dict<typeof en> = {
     },
     attachments: { removed: '{{name}}（已移除）' },
     strip: {
-        title: '本线程', sessionTitle: '本会话', expand: '展开详情', collapse: '收起详情',
+        title: '本线程', sessionTitle: '本会话', autoAt: '{{time}} 自动按推荐回答', expand: '展开详情', collapse: '收起详情',
         folder: '文件夹', copyCd: '复制 cd 命令', branch: '分支', copyBranch: '复制分支名',
         autoAnswer: {
             title: '自动回答', change: '更改', menuTitle: '问题带有推荐答案时',

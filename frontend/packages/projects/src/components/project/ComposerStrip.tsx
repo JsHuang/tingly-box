@@ -42,15 +42,20 @@ interface Props {
     thread: Thread;
     /** Saves the auto-answer setting; the row is left out without it. */
     onAutoAnswer?: (mode: AutoAnswer) => void;
+    /** When the question waiting now answers itself, if it will. */
+    autoAt?: string;
 }
 
 /**
  * What a thread runs in and how it treats its questions, in a panel right
  * above the message box: one fact per line, so a new one (a pull request,
- * CI) is one more line. Folded, it is a single line naming them all; the
- * choice is remembered per browser.
+ * CI) is one more line. Folded, it shows one line, the fact that matters
+ * most right now, and counts the rest: something about to happen without
+ * the user (a question answering itself), then what changes (the branch),
+ * and the folder only when there is nothing else. Folded or open is
+ * remembered per browser.
  */
-export function ComposerStrip({ thread, onAutoAnswer }: Props) {
+export function ComposerStrip({ thread, onAutoAnswer, autoAt }: Props) {
     const { t } = useTranslation('projects');
     const [open, setOpenState] = useState(() => readLocal(OPEN_KEY) === '1');
     const setOpen = (v: boolean) => {
@@ -64,15 +69,28 @@ export function ComposerStrip({ thread, onAutoAnswer }: Props) {
     const showAuto = !!onAutoAnswer && thread.status !== 'resolved';
     if (!thread.worktree && !branch && !showAuto) return null;
 
-    const summary = [
-        thread.worktree && <Box key="f" component="span" sx={{ ...clip, display: 'inline-flex', alignItems: 'center', gap: 0.5, flexShrink: 1 }}><FolderOpen sx={{ fontSize: 14 }} /><Box component="span" sx={{ ...clip, fontFamily: fontMono }}>{folderName(thread.worktree)}</Box></Box>,
-        branch && <Box key="b" component="span" sx={{ ...clip, display: 'inline-flex', alignItems: 'center', gap: 0.5, flexShrink: 2 }}><Branch sx={{ fontSize: 14 }} /><Box component="span" sx={{ ...clip, fontFamily: fontMono }}>{branch}</Box></Box>,
-        showAuto && <Box key="a" component="span" sx={{ ...clip, display: 'inline-flex', alignItems: 'center', gap: 0.5, flexShrink: 0 }}><AutoFixHigh sx={{ fontSize: 14, color: mode === 'off' ? 'inherit' : 'primary.main' }} />{t(`strip.autoAnswer.${mode}`)}</Box>,
-    ].filter(Boolean);
+    const rows = [!!thread.worktree, !!branch, showAuto].filter(Boolean).length;
+    const item = (icon: React.ReactNode, text: React.ReactNode, mono = false, color?: string) => (
+        <Box component="span" sx={{ ...clip, display: 'inline-flex', alignItems: 'center', gap: 0.5, color, '& svg': { fontSize: 14, flexShrink: 0 } }}>
+            {icon}<Box component="span" sx={{ ...clip, fontFamily: mono ? fontMono : undefined }}>{text}</Box>
+        </Box>
+    );
+    const time = autoAt ? new Date(autoAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+    const lead = autoAt && showAuto && mode !== 'off'
+        ? item(<AutoFixHigh />, t('strip.autoAt', { time }), false, 'primary.main')
+        : branch
+            ? item(<Branch />, branch, true)
+            : thread.worktree ? item(<FolderOpen />, folderName(thread.worktree), true) : null;
+    const summary = (
+        <>
+            {lead}
+            {rows > 1 && <Box component="span" sx={{ flexShrink: 0, color: 'text.secondary' }}>+{rows - 1}</Box>}
+        </>
+    );
 
     return (
         <Box data-testid="composer-strip" sx={{ mb: 0.75, borderRadius: 1.5, bgcolor: 'action.hover', fontSize: fontSizes.sm, lineHeight: 1.4, color: 'text.secondary', overflow: 'hidden' }}>
-            {/* Folded: one line naming every fact; the whole line unfolds it. */}
+            {/* Folded: the one fact that matters now; the whole line unfolds it. */}
             <ButtonBase
                 onClick={() => setOpen(!open)}
                 aria-expanded={open}
@@ -81,7 +99,7 @@ export function ComposerStrip({ thread, onAutoAnswer }: Props) {
             >
                 {open
                     ? <Box component="span" sx={{ flex: 1, fontWeight: 600 }}>{t(thread.project_id ? 'strip.title' : 'strip.sessionTitle')}</Box>
-                    : <Box component="span" sx={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 1.25, overflow: 'hidden' }}>{summary}</Box>}
+                    : <Box component="span" sx={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 0.75, overflow: 'hidden' }}>{summary}</Box>}
                 {open ? <ExpandMore sx={{ fontSize: 16 }} /> : <ExpandLess sx={{ fontSize: 16 }} />}
             </ButtonBase>
             <Collapse in={open} unmountOnExit>

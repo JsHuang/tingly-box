@@ -22,16 +22,21 @@ describe('ComposerStrip', () => {
         expect(autoAnswerOf(thread({ project_id: '', auto_answer: 'now' }))).toBe('now');
     });
 
-    it('folds to one line and unfolds to one line per fact', () => {
+    it('folds to the fact that matters now plus a count, and unfolds to one line per fact', () => {
         const onAutoAnswer = vi.fn();
-        render(<ComposerStrip thread={thread({ branch: 'tb/fix-login', base_branch: 'main' })} onAutoAnswer={onAutoAnswer} />);
-        // Folded: the summary names the folder, the branch and the setting.
-        expect(screen.getByText('app')).toBeInTheDocument();
+        const th = thread({ branch: 'tb/fix-login', base_branch: 'main' });
+        const { rerender } = render(<ComposerStrip thread={th} onAutoAnswer={onAutoAnswer} />);
+        // Folded: the branch leads, the folder and the setting are counted.
         expect(screen.getByText('tb/fix-login')).toBeInTheDocument();
-        expect(screen.queryByText('/work/app')).toBeNull();
+        expect(screen.getByText('+2')).toBeInTheDocument();
+        expect(screen.queryByText('app')).toBeNull();
+        // A question about to answer itself takes the line.
+        rerender(<ComposerStrip thread={th} onAutoAnswer={onAutoAnswer} autoAt={new Date().toISOString()} />);
+        expect(screen.getByText('strip.autoAt')).toBeInTheDocument();
+        expect(screen.queryByText('tb/fix-login')).toBeNull();
         fireEvent.click(screen.getByRole('button', { name: 'strip.expand' }));
         expect(screen.getByText('/work/app')).toBeInTheDocument();
-        expect(screen.getByText('strip.autoAnswer.title')).toBeInTheDocument();
+        expect(screen.getByText('tb/fix-login')).toBeInTheDocument();
         fireEvent.click(screen.getByRole('button', { name: 'strip.autoAnswer.change' }));
         fireEvent.click(screen.getByText('strip.autoAnswer.now'));
         expect(onAutoAnswer).toHaveBeenCalledWith('now');
