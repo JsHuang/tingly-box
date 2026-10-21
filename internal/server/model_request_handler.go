@@ -3,6 +3,7 @@ package server
 import (
 	"crypto/sha256"
 	"encoding/json"
+	"maps"
 	"net/http"
 	"sort"
 	"strconv"
@@ -71,7 +72,7 @@ type ModelRequestsResponse struct {
 }
 
 // requestGroup accumulates events for a single request_id while scanning the
-// memory sinks.
+// retained history and live memory.
 type requestGroup struct {
 	id       string
 	events   []ModelRequestEvent
@@ -163,10 +164,6 @@ func (h *WebHandler) GetModelRequestDetail(c *gin.Context) {
 		return
 	}
 
-	sort.SliceStable(g.events, func(i, j int) bool {
-		return g.events[i].Time.Before(g.events[j].Time)
-	})
-
 	sum := g.summary
 	sum.RequestID = g.id
 	sum.EventCount = len(g.events)
@@ -200,98 +197,73 @@ func (h *WebHandler) collectRequestGroups() (map[string]*requestGroup, error) {
 	if err != nil {
 		return nil, err
 	}
+	// Normalize live entries once, then fold both sources in time order.
+	for _, source := range []obs.LogSource{obs.LogSourceHTTP, obs.LogSourceModelRequest, obs.LogSourceSmartRouting, obs.LogSourceSystem, obs.LogSourceAction} {
+		for _, e := range h.deps.MultiLogger.WithSource(source).GetMemoryEntries() {
+			fields := maps.Clone(e.Data)
+			delete(fields, "source")
+			entries = append(entries, obs.LogEntry{Time: e.Time, Level: e.Level.String(), Message: e.Message, Source: string(source), Fields: fields})
+		}
+	}
+	sort.SliceStable(entries, func(i, j int) bool { return entries[i].Time.Before(entries[j].Time) })
 	seen := make(map[[32]byte]bool)
-	all := make(map[obs.LogSource][]*logrus.Entry)
-	for _, e := range entries {
-		level, err := logrus.ParseLevel(e.Level)
-		if err != nil {
+	for _, entry := range entries {
+		id := stringField(entry.Fields, "request_id")
+		level, err := logrus.ParseLevel(entry.Level)
+		if id == "" || err != nil {
 			continue
 		}
-		source := obs.LogSource(e.Source)
-		if source == "" {
-			source = obs.LogSourceSystem
+		if entry.Source == "" {
+			entry.Source = string(obs.LogSourceSystem)
 		}
-		all[source] = append(all[source], &logrus.Entry{Time: e.Time, Level: level, Message: e.Message, Data: e.Fields})
-	}
-	for _, source := range []obs.LogSource{obs.LogSourceHTTP, obs.LogSourceModelRequest, obs.LogSourceSmartRouting, obs.LogSourceSystem, obs.LogSourceAction} {
-		all[source] = append(all[source], h.deps.MultiLogger.WithSource(source).GetMemoryEntries()...)
-		sort.SliceStable(all[source], func(i, j int) bool { return all[source][i].Time.Before(all[source][j].Time) })
-	}
-
-	ingest := func(source obs.LogSource) {
-		for _, entry := range all[source] {
-			id, _ := entry.Data["request_id"].(string)
-			if id == "" {
+		// JSON normalizes memory values and persisted numbers for deduplication.
+		if encoded, err := json.Marshal(entry); err == nil {
+			key := sha256.Sum256(encoded)
+			if seen[key] {
 				continue
 			}
-			fields := make(map[string]interface{}, len(entry.Data))
-			for k, v := range entry.Data {
-				if k == "source" {
-					continue
-				}
-				fields[k] = v
-			}
-			// Compare the wire representation so memory ints/RawMessages and
-			// decoded JSON values deduplicate without dropping distinct events
-			// that happen to share a timestamp and message.
-			encoded, err := json.Marshal(obs.LogEntry{Time: entry.Time, Level: entry.Level.String(), Message: entry.Message, Source: string(source), Fields: fields})
-			if err == nil {
-				key := sha256.Sum256(encoded)
-				if seen[key] {
-					continue
-				}
-				seen[key] = true
-			}
-			g := groups[id]
-			if g == nil {
-				g = &requestGroup{id: id}
-				groups[id] = g
-			}
-			stage, _ := entry.Data["stage"].(string)
-
-			g.events = append(g.events, ModelRequestEvent{
-				Time:    entry.Time,
-				Source:  string(source),
-				Level:   entry.Level.String(),
-				Stage:   stage,
-				Message: entry.Message,
-				Fields:  fields,
-			})
-
-			if source == obs.LogSourceModelRequest || source == obs.LogSourceSmartRouting {
-				g.hasModel = true
-			}
-			applyToSummary(g, source, entry)
+			seen[key] = true
 		}
+		g := groups[id]
+		if g == nil {
+			g = &requestGroup{id: id}
+			groups[id] = g
+		}
+		g.events = append(g.events, ModelRequestEvent{
+			Time:    entry.Time,
+			Source:  entry.Source,
+			Level:   entry.Level,
+			Stage:   stringField(entry.Fields, "stage"),
+			Message: entry.Message,
+			Fields:  entry.Fields,
+		})
+		if entry.Source == string(obs.LogSourceModelRequest) || entry.Source == string(obs.LogSourceSmartRouting) {
+			g.hasModel = true
+		}
+		applyToSummary(g, entry, level)
 	}
-
-	ingest(obs.LogSourceHTTP)
-	ingest(obs.LogSourceModelRequest)
-	ingest(obs.LogSourceSmartRouting)
-	ingest(obs.LogSourceSystem)
-	ingest(obs.LogSourceAction)
 
 	return groups, nil
 }
 
 // applyToSummary folds one entry's fields into the request's summary, treating
 // the HTTP envelope as the authoritative source for transport metadata.
-func applyToSummary(g *requestGroup, source obs.LogSource, entry *logrus.Entry) {
-	data := entry.Data
+func applyToSummary(g *requestGroup, entry obs.LogEntry, level logrus.Level) {
+	data := entry.Fields
 
 	// Track the most severe level seen (lower logrus level == more severe).
-	if g.summary.MaxLevel == "" || entry.Level < g.severity {
-		g.severity = entry.Level
-		g.summary.MaxLevel = entry.Level.String()
+	if g.summary.MaxLevel == "" || level < g.severity {
+		g.severity = level
+		g.summary.MaxLevel = entry.Level
 	}
-	if entry.Level <= logrus.ErrorLevel {
+	if level <= logrus.ErrorLevel {
 		g.summary.HasError = true
 	}
 	if _, ok := data["error"]; ok {
 		g.summary.HasError = true
 	}
 
-	if source == obs.LogSourceHTTP {
+	if entry.Source == string(obs.LogSourceHTTP) {
 		// The access log is emitted once per request at completion; use it as
 		// the canonical timestamp and transport metadata.
 		g.summary.Time = entry.Time

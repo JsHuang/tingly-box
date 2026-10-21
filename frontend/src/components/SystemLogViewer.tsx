@@ -51,7 +51,6 @@ type SortField = 'time' | 'level' | 'status' | 'message';
 const LOG_LEVELS = ['debug', 'info', 'warn', 'error', 'fatal', 'panic'];
 
 const SystemLogViewer = ({ getLogs }: SystemLogViewerProps) => {
-    const [logs, setLogs] = useState<SystemLogEntry[]>([]);
     const [allLogs, setAllLogs] = useState<SystemLogEntry[]>([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -107,24 +106,14 @@ const SystemLogViewer = ({ getLogs }: SystemLogViewerProps) => {
     const getLevelColor = (level: string): string => getStatusColor(theme, logLevelTone(level));
     const getStatusCodeColor = (statusCode?: number): string => getStatusColor(theme, httpStatusTone(statusCode));
 
-    // Client-side filter by level
-    useEffect(() => {
-        let next = allLogs;
-        if (search.trim()) {
-            const query = search.trim().toLowerCase();
-            next = next.filter(log => JSON.stringify(log).toLowerCase().includes(query));
-        }
-        if (selectedLevels.size > 0) {
-            next = next.filter(log => {
-                const l = log.level?.toLowerCase() ?? '';
-                // match "warn" tag against "warn" or "warning"
-                return [...selectedLevels].some(sel =>
-                    l === sel || (sel === 'warn' && l === 'warning')
-                );
-            });
-        }
-        setLogs(next);
-    }, [selectedLevels, allLogs, search]);
+    const logs = useMemo(() => {
+        const query = search.trim().toLowerCase();
+        return allLogs.filter(log => {
+            const level = log.level?.toLowerCase() ?? '';
+            return (!query || JSON.stringify(log).toLowerCase().includes(query)) &&
+                (selectedLevels.size === 0 || selectedLevels.has(level === 'warning' ? 'warn' : level));
+        });
+    }, [allLogs, selectedLevels, search]);
 
     // Fetch only on mount / refresh — sorting is derived client-side below.
     useEffect(() => {

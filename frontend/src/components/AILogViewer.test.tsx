@@ -23,6 +23,22 @@ describe('AILogViewer detail refresh', () => {
         expect(screen.getByText('newest detail')).toBeInTheDocument();
     });
 
+    it('discards a pending detail response after switching requests', async () => {
+        let resolveOlder!: (value: unknown) => void;
+        const older = new Promise(resolve => { resolveOlder = resolve; });
+        const second = { ...request, request_id: 'r2', request_model: 'second-model' };
+        const getRequestDetail = vi.fn().mockReturnValueOnce(older)
+            .mockResolvedValue({ ...second, events: [{ message: 'second request detail' }] });
+        render(<AILogViewer getRequests={vi.fn().mockResolvedValue({ total: 2, requests: [request, second] })} getRequestDetail={getRequestDetail} getTrace={vi.fn()} />);
+        fireEvent.click(await screen.findByText('test-model'));
+        await waitFor(() => expect(getRequestDetail).toHaveBeenCalledTimes(1));
+        fireEvent.click(screen.getByText('second-model'));
+        expect(await screen.findByText('second request detail')).toBeInTheDocument();
+        await act(async () => resolveOlder({ ...request, events: [{ message: 'first request detail' }] }));
+        expect(screen.queryByText('first request detail')).not.toBeInTheDocument();
+        expect(screen.getByText('second request detail')).toBeInTheDocument();
+    });
+
     it('refreshes an open request instead of retaining a cached partial journey', async () => {
         const getRequestDetail = vi.fn()
             .mockResolvedValueOnce({ ...request, events: [{ message: 'started' }] })

@@ -418,36 +418,30 @@ func (ph *ProtocolHandler) DispatchWithPriorityFailover(
 			c.Set(constant.CtxKeyRecoveredErrorCount, errorsBeforeAttempt)
 		}
 
-		// A committed gate means the stream's first real chunk reached
-		// the wire — bytes have left the process, retry is impossible.
-		if gate.Committed() {
+		// Once bytes reach the wire, retry is impossible, even if streaming fails.
+		status, committed := gate.Status(), gate.Committed()
+		if committed {
 			loadbalance.RecordServiceSuccess(rule.UUID, serviceID)
-			fields := failoverLogFields(c, rule, provider, model, serviceID)
-			fields["stage"] = "failover_success"
-			fields["attempt"] = i + 1
-			fields["active_services"] = len(activeServices)
-			fields["routed_model"] = model
-			fields["routed_provider"] = provider.Name
-			if succeeded {
-				logrus.WithContext(c.Request.Context()).WithFields(fields).Infof("[failover] succeeded on attempt %d with %s/%s", i+1, provider.UUID, model)
-			} else {
-				fields["stage"] = "failover_terminal"
-				logrus.WithContext(c.Request.Context()).WithFields(fields).Errorf("[failover] stream failed after response committed on attempt %d with %s/%s", i+1, provider.UUID, model)
-			}
-			return
 		}
-		status := gate.Status()
-		if !isRetryableStatus(status) {
+		if committed || !isRetryableStatus(status) {
 			fields := failoverLogFields(c, rule, provider, model, serviceID)
 			fields["stage"] = "failover_terminal"
 			fields["attempt"] = i + 1
 			fields["active_services"] = len(activeServices)
 			fields["status"] = status
+			fields["routed_model"] = model
+			fields["routed_provider"] = provider.Name
 			if succeeded {
 				fields["stage"] = "failover_success"
-				logrus.WithContext(c.Request.Context()).WithFields(fields).Infof("[failover] succeeded on attempt %d with %s/%s", i+1, provider.UUID, model)
-			} else {
-				logrus.WithContext(c.Request.Context()).WithFields(fields).Warnf("[failover] attempt %d returned status %d with %s/%s", i+1, status, provider.UUID, model)
+			}
+			entry := logrus.WithContext(c.Request.Context()).WithFields(fields)
+			switch {
+			case succeeded:
+				entry.Infof("[failover] succeeded on attempt %d with %s/%s", i+1, provider.UUID, model)
+			case committed:
+				entry.Errorf("[failover] stream failed after response committed on attempt %d with %s/%s", i+1, provider.UUID, model)
+			default:
+				entry.Warnf("[failover] attempt %d returned status %d with %s/%s", i+1, status, provider.UUID, model)
 			}
 			return
 		}

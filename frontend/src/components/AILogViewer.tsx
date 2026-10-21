@@ -93,15 +93,14 @@ const AILogViewer = ({ getRequests, getRequestDetail, getTrace, initialScenario 
     const [loading, setLoading] = useState(false);
     const [autoRefresh, setAutoRefresh] = useState(true);
     const [expandedId, setExpandedId] = useState<string | null>(null);
-    const [details, setDetails] = useState<Record<string, ModelRequestDetail>>({});
-    const [detailErrors, setDetailErrors] = useState<Record<string, string>>({});
+    const [detailState, setDetailState] = useState<{ id: string; detail?: ModelRequestDetail; error?: string }>();
+    const [detailVersion, setDetailVersion] = useState(0);
     const [error, setError] = useState<string | null>(null);
     // Always start unfiltered so the user sees the full picture.
     // initialScenario is kept as a prop only to power the quick-filter chip.
     const [scenario, setScenario] = useState('');
     const tableContainerRef = useRef<HTMLDivElement>(null);
     const listSequence = useRef(0);
-    const detailSequences = useRef<Record<string, number>>({});
     // Sorting is client-side only — never triggers a refetch.
     const { sortField, sortOrder, handleSort } = useTableSort<SortField>('time');
 
@@ -119,7 +118,7 @@ const AILogViewer = ({ getRequests, getRequestDetail, getTrace, initialScenario 
                 setRequests(response.requests);
                 setTotal(response.total);
             }
-            if (expandedId) await loadDetail(expandedId);
+            setDetailVersion(version => version + 1);
         } catch (e: any) {
             if (sequence === listSequence.current) setError(e instanceof Error ? e.message : 'Failed to load requests');
         } finally {
@@ -133,7 +132,7 @@ const AILogViewer = ({ getRequests, getRequestDetail, getTrace, initialScenario 
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [scenario, limit]);
 
-    useAutoRefresh(autoRefresh, loadRequests, [scenario, expandedId, limit]);
+    useAutoRefresh(autoRefresh, loadRequests, [scenario, limit]);
 
     // Client-side sort — re-sorts the already-fetched rows instead of
     // refetching from the network on every sort change.
@@ -166,31 +165,18 @@ const AILogViewer = ({ getRequests, getRequestDetail, getTrace, initialScenario 
         });
     }, [requests, sortField, sortOrder, search, errorsOnly]);
 
-    const loadDetail = async (id: string) => {
-        const sequence = (detailSequences.current[id] || 0) + 1;
-        detailSequences.current[id] = sequence;
-        setDetailErrors(prev => ({ ...prev, [id]: '' }));
-        try {
-            const detail = await getRequestDetail(id);
-            if (detailSequences.current[id] !== sequence) return;
-            if (!detail) {
-                setDetailErrors(prev => ({ ...prev, [id]: 'Request details are no longer available in retained history.' }));
-                return;
-            }
-            setDetails(prev => ({ ...prev, [id]: detail }));
-        } catch (e: unknown) {
-            if (detailSequences.current[id] === sequence) setDetailErrors(prev => ({ ...prev, [id]: e instanceof Error ? e.message : 'Failed to load request detail' }));
-        }
-    };
-
-    const toggleRow = async (id: string) => {
-        if (expandedId === id) {
-            setExpandedId(null);
-            return;
-        }
-        setExpandedId(id);
-        await loadDetail(id);
-    };
+    // Only the open request owns detail state. Cleanup rejects stale responses.
+    useEffect(() => {
+        if (!expandedId) return;
+        let cancelled = false;
+        getRequestDetail(expandedId).then(detail => {
+            if (!cancelled) setDetailState({ id: expandedId, detail: detail ?? undefined,
+                error: detail ? undefined : 'Request details are no longer available in retained history.' });
+        }).catch((error: unknown) => {
+            if (!cancelled) setDetailState({ id: expandedId, error: error instanceof Error ? error.message : 'Failed to load request detail' });
+        });
+        return () => { cancelled = true; };
+    }, [expandedId, detailVersion, getRequestDetail]);
 
     return (
         <Stack spacing={1.5} sx={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
@@ -352,13 +338,14 @@ const AILogViewer = ({ getRequests, getRequestDetail, getTrace, initialScenario 
                             ) : (
                                 sortedRequests.map((req) => {
                                     const expanded = expandedId === req.request_id;
-                                    const detail = details[req.request_id];
+                                    const current = detailState?.id === req.request_id ? detailState : undefined;
+                                    const detail = current?.detail;
                                     return (
                                         <Fragment key={req.request_id}>
                                             <TableRow
                                                 hover
                                                 sx={{ cursor: 'pointer' }}
-                                                onClick={() => toggleRow(req.request_id)}
+                                                onClick={() => setExpandedId(expanded ? null : req.request_id)}
                                             >
                                                 <TableCell padding="checkbox">
                                                     <IconButton size="small">
@@ -411,7 +398,7 @@ const AILogViewer = ({ getRequests, getRequestDetail, getTrace, initialScenario 
                                                 <TableCell colSpan={7} sx={{ pb: 0, pt: 0, border: 'none' }}>
                                                     <Collapse in={expanded} timeout="auto" unmountOnExit>
                                                         <Box sx={{ p: 1.5, backgroundColor: 'rgba(0,0,0,0.02)' }}>
-                                                            {detailErrors[req.request_id] && <Alert severity="warning">{detailErrors[req.request_id]}</Alert>}
+                                                            {current?.error && <Alert severity="warning">{current?.error}</Alert>}
                                                             {detail ? (
                                                                 <RequestJourney
                                                                     events={detail.events}
@@ -420,7 +407,7 @@ const AILogViewer = ({ getRequests, getRequestDetail, getTrace, initialScenario 
                                                                 />
                                                             ) : (
                                                                 <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                                                                    {detailErrors[req.request_id] ? 'Use refresh to retry.' : 'Loading journey...'}
+                                                                    {current?.error ? 'Use refresh to retry.' : 'Loading journey...'}
                                                                 </Typography>
                                                             )}
                                                             <Stack
