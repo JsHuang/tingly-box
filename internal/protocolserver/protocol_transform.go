@@ -260,7 +260,7 @@ func (ph *ProtocolHandler) targetTransforms(c *gin.Context, plan *attemptPlan) [
 		transforms = append(transforms, servertransform.NewOutputLimitTransform(plan.MaxAllowed))
 	}
 
-	if ph.mcpEnabled() {
+	if ph.mcpEnabled() && !isCompactionSummary(c) {
 		if mcpServesPair(plan.Source, plan.Target) {
 			transforms = append(transforms, ph.mcpChainTransforms(ph.mcpStripDisabledToolsEnabled())...)
 		} else {

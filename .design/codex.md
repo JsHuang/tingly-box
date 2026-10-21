@@ -75,9 +75,12 @@ Desktop applications can bundle a different core version.
 - The old `features.remote_compaction_v2` switch is removed and ignored. The
   supported custom-provider override is
   `[model_providers.tingly-box.capabilities] remote_compaction = "v2"`.
-  Use it only when every routed backend supports V2, not for mixed chat/Anthropic
-  backends. TB's current Quick Config rebuilds its managed provider stanza, so
-  reapplying Quick Config also replaces a manually added capability override.
+  TB can now serve that V2 contract through native Codex forwarding or the
+  ordinary-inference summary adapter in `compaction.md`, including mixed
+  Chat/Anthropic routes supported by the existing Responses ingress. Native
+  opaque ciphertext remains bound to its original provider. Quick Config still
+  rebuilds its managed provider stanza; default capability generation is a
+  separate rollout step.
 
 The standalone `POST /responses/compact` JSON endpoint remains a supported public
 OpenAI contract and is separate from either audited CLI branch. The gateway
@@ -102,7 +105,9 @@ authentication (openai/codex #52016). An upstream message identifies where an
 error was produced, not whether the gateway contributed to its trigger. The
 encrypted-history regression tests prove local request fidelity only, not that
 this upstream failure is repaired. Keep HTTP errors and in-stream errors visible;
-do not replace protection failures with successful or fabricated compaction.
+do not replace native protection failures with successful or fabricated compaction.
+The explicit TB summary adapter is a separate protocol implementation, selected
+by backend capability before dispatch, not a retry after a protection error.
 
 ## 2. Downgrading to Chat Completions or Anthropic
 

@@ -66,7 +66,7 @@ func TestResponsesCompactionCannotDowngradeToChat(t *testing.T) {
 	env.SetupRoute(protocol.TypeOpenAIResponses, protocol.TypeOpenAIChat, s)
 	model := env.routeModels[routeKey(protocol.TypeOpenAIResponses, protocol.TypeOpenAIChat, s.Name)]
 	for _, fields := range []string{
-		`"input":[{"type":"compaction_trigger"}]`,
+
 		`"input":[{"type":"compaction","encrypted_content":"opaque"}]`,
 		`"input":"hello","context_management":[{"type":"compaction","compact_threshold":10000}]`,
 	} {

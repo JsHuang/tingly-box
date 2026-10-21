@@ -207,11 +207,28 @@ func (ph *ProtocolHandler) runOpenAIResponsesAttempt(c *gin.Context, req *protoc
 		ph.FailAttemptSetup(c, err)
 		return
 	}
+	expanded, err := expandTBCompactions(req.ResponseNewParams)
+	if err != nil {
+		compactBadRequest(c, err.Error())
+		return
+	}
+	requestCopy := *req
+	requestCopy.ResponseNewParams = expanded
+	req = &requestCopy
+	if hasCompactionTrigger(expanded) && !plan.Provider.IsCodexProvider() && !hasNativeCompactionManagement(expanded) {
+		ph.runSummaryCompaction(c, req, plan, responseModel, rule, isStreaming, scenarioType)
+		return
+	}
 	if requiresNativeResponsesCompaction(req.ResponseNewParams) && plan.Target != protocol.TypeOpenAIResponses {
 		unsupportedResponsesCompaction(c)
 		return
 	}
-	req.Model = responses.ResponsesModel(actualModel)
+	ph.runPlannedResponsesAttempt(c, req, plan, responseModel, rule, isStreaming, scenarioType)
+}
+
+// The plan is resolved once per attempt, including gateway summary requests.
+func (ph *ProtocolHandler) runPlannedResponsesAttempt(c *gin.Context, req *protocol.ResponseCreateRequest, plan *attemptPlan, responseModel string, rule *typ.Rule, isStreaming bool, scenarioType typ.RuleScenario) {
+	req.Model = responses.ResponsesModel(plan.Model)
 
 	reqCtx, err := ph.TransformOpenAIResponses(c, req, plan, isStreaming, scenarioType)
 	if err != nil {
@@ -225,7 +242,7 @@ func (ph *ProtocolHandler) runOpenAIResponsesAttempt(c *gin.Context, req *protoc
 		return
 	}
 
-	reqCtx.RequestModel = actualModel
+	reqCtx.RequestModel = plan.Model
 	reqCtx.ResponseModel = responseModel
 	ph.DispatchChainResult(c, reqCtx, rule, plan.Provider, isStreaming)
 }
