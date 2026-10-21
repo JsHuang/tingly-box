@@ -26,6 +26,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
+	"github.com/tingly-dev/tingly-box/internal/constant"
 	"github.com/tingly-dev/tingly-box/internal/recording"
 
 	"github.com/tingly-dev/tingly-box/internal/loadbalance"
@@ -62,7 +63,7 @@ func (ph *ProtocolHandler) handlePreStreamFailure(c *gin.Context, err error, rec
 // rejected in the prologue, before the gate is installed, so they remain
 // non-retryable and reach the client unchanged.
 func (ph *ProtocolHandler) FailAttemptSetup(c *gin.Context, err error) {
-	c.JSON(http.StatusInternalServerError, ErrorResponse{
+	writeErrorResponse(c, http.StatusInternalServerError, ErrorResponse{
 		Error: ErrorDetail{
 			Message: protocol.UpstreamMessage(err),
 			Type:    "api_error",
@@ -408,9 +409,14 @@ func (ph *ProtocolHandler) DispatchWithPriorityFailover(
 		// is the structured record of the retry history.
 		attemptSpan := ph.startFailoverAttemptSpan(c.Request.Context(), i+1, serviceID, provider.UUID)
 
+		errorsBeforeAttempt := len(c.Errors)
 		attempt(provider, model)
 
-		endFailoverAttemptSpan(attemptSpan, gate.Committed(), gate.Status())
+		succeeded := gate.Status() >= 200 && gate.Status() < 400 && len(c.Errors) == errorsBeforeAttempt
+		endFailoverAttemptSpan(attemptSpan, succeeded, gate.Status())
+		if succeeded {
+			c.Set(constant.CtxKeyRecoveredErrorCount, errorsBeforeAttempt)
+		}
 
 		// A committed gate means the stream's first real chunk reached
 		// the wire — bytes have left the process, retry is impossible.
@@ -422,7 +428,12 @@ func (ph *ProtocolHandler) DispatchWithPriorityFailover(
 			fields["active_services"] = len(activeServices)
 			fields["routed_model"] = model
 			fields["routed_provider"] = provider.Name
-			logrus.WithContext(c.Request.Context()).WithFields(fields).Infof("[failover] succeeded on attempt %d with %s/%s", i+1, provider.UUID, model)
+			if succeeded {
+				logrus.WithContext(c.Request.Context()).WithFields(fields).Infof("[failover] succeeded on attempt %d with %s/%s", i+1, provider.UUID, model)
+			} else {
+				fields["stage"] = "failover_terminal"
+				logrus.WithContext(c.Request.Context()).WithFields(fields).Errorf("[failover] stream failed after response committed on attempt %d with %s/%s", i+1, provider.UUID, model)
+			}
 			return
 		}
 		status := gate.Status()
@@ -432,7 +443,12 @@ func (ph *ProtocolHandler) DispatchWithPriorityFailover(
 			fields["attempt"] = i + 1
 			fields["active_services"] = len(activeServices)
 			fields["status"] = status
-			logrus.WithContext(c.Request.Context()).WithFields(fields).Warnf("[failover] attempt %d returned status %d with %s/%s", i+1, status, provider.UUID, model)
+			if succeeded {
+				fields["stage"] = "failover_success"
+				logrus.WithContext(c.Request.Context()).WithFields(fields).Infof("[failover] succeeded on attempt %d with %s/%s", i+1, provider.UUID, model)
+			} else {
+				logrus.WithContext(c.Request.Context()).WithFields(fields).Warnf("[failover] attempt %d returned status %d with %s/%s", i+1, status, provider.UUID, model)
+			}
 			return
 		}
 

@@ -1,9 +1,12 @@
 package server
 
 import (
+	"crypto/sha256"
+	"encoding/json"
 	"net/http"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -79,7 +82,7 @@ type requestGroup struct {
 
 // GetModelRequests returns recent model requests, one row per correlation id,
 // built by joining the HTTP access log, model_request stage logs and
-// smart-routing traces from the in-memory sinks.
+// smart-routing traces from recent JSON history and the live memory sinks.
 //
 // Query parameters:
 //   - limit: maximum number of requests to return (default: 100, max: 1000)
@@ -95,7 +98,11 @@ func (h *WebHandler) GetModelRequests(c *gin.Context) {
 	providerFilter := c.Query("provider")
 	statusFilter := c.Query("status")
 
-	groups := h.collectRequestGroups()
+	groups, err := h.collectRequestGroups()
+	if err != nil {
+		apierr.Message(c, http.StatusInternalServerError, "Failed to read request history")
+		return
+	}
 
 	summaries := make([]ModelRequestSummary, 0, len(groups))
 	for _, g := range groups {
@@ -145,7 +152,11 @@ func (h *WebHandler) GetModelRequestDetail(c *gin.Context) {
 		return
 	}
 
-	groups := h.collectRequestGroups()
+	groups, err := h.collectRequestGroups()
+	if err != nil {
+		apierr.Message(c, http.StatusInternalServerError, "Failed to read request history")
+		return
+	}
 	g, ok := groups[id]
 	if !ok {
 		apierr.Message(c, http.StatusNotFound, "request not found")
@@ -166,30 +177,75 @@ func (h *WebHandler) GetModelRequestDetail(c *gin.Context) {
 	})
 }
 
-// collectRequestGroups scans the HTTP, model_request and smart_routing memory
-// sinks and groups every entry by its request_id.
-func (h *WebHandler) collectRequestGroups() map[string]*requestGroup {
+const recentRequestEventLimit = 5000
+
+// collectRequestGroups joins a bounded persistent history with live memory
+// entries. Memory is a cache, not the retention boundary for request details.
+func (h *WebHandler) collectRequestGroups() (map[string]*requestGroup, error) {
 	groups := make(map[string]*requestGroup)
+	entries, err := h.deps.MultiLogger.ReadJSONLogsFiltered(recentRequestEventLimit, func(e obs.LogEntry) bool {
+		if stringField(e.Fields, "request_id") == "" {
+			return false
+		}
+		switch obs.LogSource(e.Source) {
+		case obs.LogSourceHTTP:
+			return strings.HasPrefix(stringField(e.Fields, "path"), "/tingly/") ||
+				firstStringField(e.Fields, "scenario", "request_model", "routed_provider") != ""
+		case obs.LogSourceModelRequest, obs.LogSourceSmartRouting, obs.LogSourceSystem, obs.LogSourceAction, "":
+			return true
+		default:
+			return false
+		}
+	})
+	if err != nil {
+		return nil, err
+	}
+	seen := make(map[[32]byte]bool)
+	all := make(map[obs.LogSource][]*logrus.Entry)
+	for _, e := range entries {
+		level, err := logrus.ParseLevel(e.Level)
+		if err != nil {
+			continue
+		}
+		source := obs.LogSource(e.Source)
+		if source == "" {
+			source = obs.LogSourceSystem
+		}
+		all[source] = append(all[source], &logrus.Entry{Time: e.Time, Level: level, Message: e.Message, Data: e.Fields})
+	}
+	for _, source := range []obs.LogSource{obs.LogSourceHTTP, obs.LogSourceModelRequest, obs.LogSourceSmartRouting, obs.LogSourceSystem, obs.LogSourceAction} {
+		all[source] = append(all[source], h.deps.MultiLogger.WithSource(source).GetMemoryEntries()...)
+		sort.SliceStable(all[source], func(i, j int) bool { return all[source][i].Time.Before(all[source][j].Time) })
+	}
 
 	ingest := func(source obs.LogSource) {
-		entries := h.deps.MultiLogger.WithSource(source).GetMemoryEntries()
-		for _, entry := range entries {
+		for _, entry := range all[source] {
 			id, _ := entry.Data["request_id"].(string)
 			if id == "" {
 				continue
 			}
-			g := groups[id]
-			if g == nil {
-				g = &requestGroup{id: id}
-				groups[id] = g
-			}
-
 			fields := make(map[string]interface{}, len(entry.Data))
 			for k, v := range entry.Data {
 				if k == "source" {
 					continue
 				}
 				fields[k] = v
+			}
+			// Compare the wire representation so memory ints/RawMessages and
+			// decoded JSON values deduplicate without dropping distinct events
+			// that happen to share a timestamp and message.
+			encoded, err := json.Marshal(obs.LogEntry{Time: entry.Time, Level: entry.Level.String(), Message: entry.Message, Source: string(source), Fields: fields})
+			if err == nil {
+				key := sha256.Sum256(encoded)
+				if seen[key] {
+					continue
+				}
+				seen[key] = true
+			}
+			g := groups[id]
+			if g == nil {
+				g = &requestGroup{id: id}
+				groups[id] = g
 			}
 			stage, _ := entry.Data["stage"].(string)
 
@@ -212,8 +268,10 @@ func (h *WebHandler) collectRequestGroups() map[string]*requestGroup {
 	ingest(obs.LogSourceHTTP)
 	ingest(obs.LogSourceModelRequest)
 	ingest(obs.LogSourceSmartRouting)
+	ingest(obs.LogSourceSystem)
+	ingest(obs.LogSourceAction)
 
-	return groups
+	return groups, nil
 }
 
 // applyToSummary folds one entry's fields into the request's summary, treating
@@ -237,7 +295,7 @@ func applyToSummary(g *requestGroup, source obs.LogSource, entry *logrus.Entry) 
 		// The access log is emitted once per request at completion; use it as
 		// the canonical timestamp and transport metadata.
 		g.summary.Time = entry.Time
-		if v, ok := data["status"].(int); ok {
+		if v := intField(data["status"]); v != 0 {
 			g.summary.Status = v
 			if v >= 400 {
 				g.summary.HasError = true
@@ -302,6 +360,20 @@ func applyToSummary(g *requestGroup, source obs.LogSource, entry *logrus.Entry) 
 			}
 			g.summary.FailoverPath += to
 		}
+	}
+}
+
+// JSON-backed entries decode numbers as float64, memory entries retain ints.
+func intField(v interface{}) int {
+	switch n := v.(type) {
+	case int:
+		return n
+	case int64:
+		return int(n)
+	case float64:
+		return int(n)
+	default:
+		return 0
 	}
 }
 
